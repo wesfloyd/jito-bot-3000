@@ -60,7 +60,7 @@ main() {
     log_info ""
     log_info "Next steps:"
     log_info "  1. Wait 2-3 minutes for instance initialization"
-    log_info "  2. Run: ./scripts/04-generate-keys.sh"
+    log_info "  2. Run: ./scripts/utils/setup/ssh-keys.sh"
     log_info "  3. Check status: ./scripts/infra/status.sh"
     log_info ""
 }

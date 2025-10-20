@@ -51,7 +51,7 @@ main() {
     log_info "  1. Review and customize config files:"
     log_info "     - config/aws-config.env"
     log_info "     - config/jito-config.env"
-    log_info "  2. Run deployment: ./scripts/01-provision-aws.sh"
+    log_info "  2. Run deployment: ./scripts/infra/deploy.sh"
     log_info ""
 }
 

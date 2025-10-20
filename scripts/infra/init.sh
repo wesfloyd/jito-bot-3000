@@ -42,7 +42,7 @@ main() {
     log_info ""
     log_info "Next steps:"
     log_info "  1. Review configuration: terraform/terraform.tfvars"
-    log_info "  2. Run: ./scripts/02-terraform-plan.sh"
+    log_info "  2. Run: ./scripts/infra/plan.sh"
     log_info ""
 }
 
