@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Script 12: Terraform Stop
+# Stops Terraform-managed EC2 instances without destroying infrastructure
+
+set -euo pipefail
+
+# Get script directory and source libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/utils/lib/common.sh
+source "${SCRIPT_DIR}/../utils/lib/common.sh"
+# shellcheck source=scripts/utils/lib/terraform-helpers.sh
+source "${SCRIPT_DIR}/../utils/lib/terraform-helpers.sh"
+
+# ============================================================================
+# Main Function
+# ============================================================================
+
+main() {
+    print_banner
+
+    log_section "Terraform Stop"
+
+    # Check if Terraform state exists
+    if ! terraform_status >/dev/null 2>&1; then
+        log_warn "No Terraform state found"
+        log_info "Nothing to stop"
+        exit 0
+    fi
+
+    # Get current instance information
+    local instance_id
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
+
+    if [[ -z "$instance_id" ]]; then
+        log_warn "No instance found in Terraform state"
+        log_info "Nothing to stop"
+        exit 0
+    fi
+
+    # Check current instance state from Terraform
+    local current_state
+    current_state=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
+
+    log_info "Instance ID: $instance_id"
+    log_info "Current state: $current_state"
+
+    case "$current_state" in
+        "stopped")
+            log_info "Instance is already stopped"
+            log_success "Nothing to do - instance is already stopped"
+            exit 0
+            ;;
+        "stopping")
+            log_info "Instance is already stopping"
+            log_info "Please wait for the stop operation to complete"
+            exit 0
+            ;;
+        "terminated")
+            log_warn "Instance is terminated"
+            log_info "Cannot stop a terminated instance"
+            exit 0
+            ;;
+        "running")
+            # Confirm before stopping
+            if [[ "${AUTO_CONFIRM:-}" != "true" ]]; then
+                if ! prompt_confirmation "Stop the instance to save compute costs?"; then
+                    log_info "Stop cancelled by user"
+                    exit 0
+                fi
+            else
+                log_info "Auto-confirm enabled, proceeding with stop..."
+            fi
+
+            # Stop the instance
+            log_info "Stopping instance: $instance_id"
+            local aws_region
+            aws_region=$(get_terraform_output "region" 2>/dev/null || echo "us-west-1")
+            if aws ec2 stop-instances --region "$aws_region" --instance-ids "$instance_id" >/dev/null; then
+                log_success "Instance stop initiated successfully"
+                log_info "Instance will stop in a few moments"
+                
+                # Wait for instance to stop
+                log_info "Waiting for instance to stop..."
+                aws ec2 wait instance-stopped --region "$aws_region" --instance-ids "$instance_id"
+                log_success "Instance stopped successfully"
+
+                # Refresh Terraform state so outputs reflect the new AWS state
+                log_info "Refreshing Terraform state to sync instance status..."
+                local terraform_dir
+                terraform_dir=$(get_terraform_dir)
+                (
+                    cd "$terraform_dir" || exit 1
+                    # Use refresh-only to update state without changing resources
+                    if terraform apply -refresh-only -auto-approve >/dev/null 2>&1; then
+                        log_success "Terraform state refreshed"
+                    else
+                        log_warn "Terraform refresh failed; state may lag until next plan/apply"
+                    fi
+                )
+            else
+                log_error "Failed to stop instance"
+                exit 1
+            fi
+            ;;
+        *)
+            log_error "Unknown instance state: $current_state"
+            exit 1
+            ;;
+    esac
+
+    # Show status after stop
+    show_stop_status
+}
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+show_stop_status() {
+    local instance_id
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
+
+    if [[ -n "$instance_id" ]]; then
+        local current_state
+        current_state=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
+
+        log_section "Instance Status"
+        log_info "Instance ID: $instance_id"
+        log_info "State: $current_state"
+        
+        if [[ "$current_state" == "stopped" ]]; then
+            log_success "Instance is stopped and not incurring compute costs"
+            log_info ""
+            log_info "To restart the instance:"
+            log_info "  ./scripts/infra/start.sh"
+            log_info ""
+            log_info "To completely destroy infrastructure:"
+            log_info "  ./scripts/infra/destroy.sh"
+        fi
+    fi
+}
+
+# ============================================================================
+# Script Execution
+# ============================================================================
+
+# Run main function
+main "$@"
