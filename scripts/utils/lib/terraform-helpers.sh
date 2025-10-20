@@ -15,7 +15,7 @@ fi
 get_terraform_dir() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    echo "$(dirname "$(dirname "$script_dir")")/terraform"
+    echo "$(dirname "$(dirname "$(dirname "$script_dir")")")/terraform"
 }
 
 ensure_terraform_dir() {

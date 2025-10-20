@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Script 10: Monitor Infrastructure
+# Script: Monitor Infrastructure
 # Shows current status of Terraform-managed infrastructure
 
 set -euo pipefail
@@ -7,9 +7,9 @@ set -euo pipefail
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/utils/lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/../utils/lib/common.sh"
 # shellcheck source=scripts/utils/lib/terraform-helpers.sh
-source "${SCRIPT_DIR}/lib/terraform-helpers.sh"
+source "${SCRIPT_DIR}/../utils/lib/terraform-helpers.sh"
 
 # ============================================================================
 # Main Function
@@ -123,7 +123,6 @@ show_cost_information() {
             current_epoch=$(date +%s)
             local uptime_seconds=$((current_epoch - launch_epoch))
             local uptime_hours=$((uptime_seconds / 3600))
-            local uptime_minutes=$(((uptime_seconds % 3600) / 60))
 
             echo "${BOLD}Uptime:${RESET} ${uptime_hours}h ${uptime_minutes}m"
             echo ""
