@@ -208,14 +208,14 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 4: Account Funding (Bash)
+## Phase 4: Account Funding (Bash) ✅ COMPLETED
 
 ### 4.1 Testnet SOL Funding
-- [ ] Create `scripts/utils/fund-accounts.sh` for SOL funding automation
-- [ ] Connect to testnet
-- [ ] Request SOL airdrop for validator account
-- [ ] Request SOL airdrop for vote account
-- [ ] Verify account balances
+- [x] Create `scripts/utils/fund-accounts.sh` for SOL funding automation
+- [x] Connect to testnet
+- [x] Request SOL airdrop for validator account
+- [x] Request SOL airdrop for vote account
+- [x] Verify account balances
 
 ---
 
@@ -274,69 +274,3 @@ resource "aws_instance" "jito_validator" {
 - [ ] Cleanup resources
 
 ---
-
-## Migration Tasks
-
-### Task 1: Create Terraform Infrastructure
-- [ ] Create terraform/ directory
-- [ ] Write main.tf with provider configuration
-- [ ] Create variables.tf with all necessary variables
-- [ ] Create outputs.tf for connection information
-- [ ] Create terraform.tfvars.example
-
-### Task 2: Update Scripts
-- [x] Organize scripts into logical folders (infra/, validator/, utils/)
-- [x] Consolidate setup/, lib/, and utils/ under utils/ folder
-- [x] Create infrastructure management scripts (init.sh, plan.sh, deploy.sh, etc.)
-- [x] Update validator scripts to use Terraform state
-- [x] Create utility scripts for monitoring and status
-- [x] Update all script references to new folder structure
-
-### Task 3: Update Configuration
-- [ ] Create terraform.tfvars from aws-config.env
-- [ ] Update .gitignore for Terraform files
-- [ ] Create terraform-helpers.sh library
-
-### Task 4: Clean Up Old Code
-- [ ] Remove aws-helpers.sh (replace with Terraform)
-- [ ] Update common.sh to work with Terraform
-- [ ] Remove manual AWS CLI provisioning logic
-
-### Task 5: Testing & Validation
-- [ ] Test Terraform plan
-- [ ] Test Terraform apply
-- [ ] Test Terraform destroy
-- [ ] Validate all scripts work together
-
----
-
-## Benefits of Terraform Approach
-
-### Reliability
-- ✅ Built-in retry logic for AWS API calls
-- ✅ Proper dependency management
-- ✅ State consistency checks
-- ✅ Rollback capabilities
-
-### Maintainability
-- ✅ Declarative configuration
-- ✅ Version control for infrastructure
-- ✅ Easy to modify and extend
-- ✅ Industry standard practices
-
-### Flexibility
-- ✅ Easy region switching
-- ✅ Multiple environment support
-- ✅ Module-based architecture
-- ✅ Resource tagging and organization
-
----
-
-## Next Steps
-
-1. **Create Terraform configuration files**
-2. **Update existing scripts to use Terraform**
-3. **Test the complete workflow**
-4. **Document the new process**
-
-This approach will be much more robust and maintainable than the previous bash-only approach! 🚀
