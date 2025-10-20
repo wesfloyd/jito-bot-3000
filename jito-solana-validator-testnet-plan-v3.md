@@ -35,22 +35,30 @@ terraform/
         └── outputs.tf         # Module outputs
 
 scripts/
-├── 00-setup-local.sh           # Local prerequisites and Terraform setup
-├── 01-terraform-init.sh        # Terraform initialization
-├── 02-terraform-plan.sh        # Show planned changes
-├── 03-terraform-apply.sh       # Apply infrastructure
-├── 04-generate-keys.sh         # Keypair generation (local)
-├── 05-fund-accounts.sh         # Testnet SOL funding automation
-├── 06-setup-validator.sh       # Remote VM setup via SSH
-├── 07-build-jito.sh           # Jito-Solana compilation on VM
-├── 08-configure-validator.sh   # Generate validator.sh script
-├── 09-launch-validator.sh      # Start validator and verify
-├── 10-monitor.sh              # Health checks and monitoring
-├── 11-terraform-destroy.sh    # Cleanup infrastructure
-└── lib/
-    ├── common.sh              # Shared functions, logging, error handling
-    ├── terraform-helpers.sh   # Terraform-specific utilities
-    └── solana-helpers.sh      # Solana CLI wrappers
+├── infra/                      # Infrastructure management (Terraform)
+│   ├── init.sh                # Terraform initialization
+│   ├── plan.sh                # Show planned changes
+│   ├── deploy.sh              # Apply infrastructure
+│   ├── start.sh               # Start stopped infrastructure
+│   ├── stop.sh                # Stop infrastructure (save costs)
+│   └── destroy.sh             # Cleanup infrastructure
+├── validator/                  # Validator management
+│   ├── start.sh               # Start validator instance
+│   ├── stop.sh                # Stop validator instance
+│   ├── setup.sh               # Remote VM setup via SSH
+│   ├── build.sh               # Jito-Solana compilation on VM
+│   ├── configure.sh           # Generate validator.sh script
+│   └── launch.sh              # Start validator and verify
+└── utils/                      # Utilities, setup, and shared libraries
+    ├── setup/                  # Initial setup scripts
+    │   ├── local.sh           # Local prerequisites and Terraform setup
+    │   └── ssh-keys.sh        # SSH keypair generation
+    ├── lib/                    # Shared libraries
+    │   ├── common.sh          # Shared functions, logging, error handling
+    │   ├── terraform-helpers.sh # Terraform-specific utilities
+    │   └── solana-helpers.sh  # Solana CLI wrappers
+    ├── status.sh              # Health checks and monitoring
+    └── fund-accounts.sh       # Testnet SOL funding automation
 
 config/
 ├── terraform.tfvars           # Terraform variables (gitignored)
@@ -74,20 +82,21 @@ terraform.tfstate.backup       # Terraform state backup (gitignored)
 ## Phase 1: Environment Setup (Terraform + Local)
 
 ### 1.1 Prerequisites
-- [ ] Install Terraform CLI
-- [ ] Verify AWS CLI configuration
-- [ ] Create terraform/ directory structure
-- [ ] Initialize Terraform providers
+- [x] Install Terraform CLI (`./scripts/utils/setup/local.sh`)
+- [x] Verify AWS CLI configuration
+- [x] Create terraform/ directory structure
+- [x] Generate SSH keys (`./scripts/utils/setup/ssh-keys.sh`)
+- [x] Initialize Terraform providers (`./scripts/infra/init.sh`)
 
 ### 1.2 Terraform Configuration
-- [ ] Create main.tf with provider configuration
-- [ ] Define variables in variables.tf
-- [ ] Create outputs.tf for connection info
-- [ ] Set up terraform.tfvars for configuration
+- [x] Create main.tf with provider configuration
+- [x] Define variables in variables.tf
+- [x] Create outputs.tf for connection info
+- [x] Set up terraform.tfvars for configuration
 
 ---
 
-## Phase 2: Infrastructure Provisioning (Terraform)
+## Phase 2: Infrastructure Provisioning (Terraform) ✅ COMPLETED
 
 ### 2.1 Network Infrastructure
 ```hcl
@@ -273,11 +282,12 @@ resource "aws_instance" "jito_validator" {
 - [ ] Create terraform.tfvars.example
 
 ### Task 2: Update Scripts
-- [ ] Modify 01-provision-aws.sh to use Terraform
-- [ ] Create 01-terraform-init.sh
-- [ ] Create 02-terraform-plan.sh
-- [ ] Create 03-terraform-apply.sh
-- [ ] Create 11-terraform-destroy.sh
+- [x] Organize scripts into logical folders (infra/, validator/, utils/)
+- [x] Consolidate setup/, lib/, and utils/ under utils/ folder
+- [x] Create infrastructure management scripts (init.sh, plan.sh, deploy.sh, etc.)
+- [x] Update validator scripts to use Terraform state
+- [x] Create utility scripts for monitoring and status
+- [x] Update all script references to new folder structure
 
 ### Task 3: Update Configuration
 - [ ] Create terraform.tfvars from aws-config.env

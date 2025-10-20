@@ -24,7 +24,9 @@ terraform.tfstate
 terraform.tfstate.backup
 terraform.tfstate.lock.info
 .terraform/
-.terraform.lock.hcl
+
+# Note: .terraform.lock.hcl should typically be committed for team consistency
+# .terraform.lock.hcl
 
 # Terraform variable files (may contain sensitive data)
 terraform.tfvars

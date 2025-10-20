@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Start Validator Instance
-# Starts a stopped EC2 instance and updates deployment state
+# Starts a stopped Terraform-managed EC2 instance
 
 set -euo pipefail
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
-# shellcheck source=scripts/lib/aws-helpers.sh
-source "${SCRIPT_DIR}/lib/aws-helpers.sh"
+# shellcheck source=scripts/utils/lib/common.sh
+source "${SCRIPT_DIR}/../utils/lib/common.sh"
+# shellcheck source=scripts/utils/lib/terraform-helpers.sh
+source "${SCRIPT_DIR}/../utils/lib/terraform-helpers.sh"
 
 # ============================================================================
 # Main Function
@@ -20,21 +20,21 @@ main() {
 
     log_section "Start Validator Instance"
 
-    # Check if deployment state exists
-    if [[ ! -f "$STATE_FILE" ]]; then
-        log_error "Deployment state not found: $STATE_FILE"
-        log_info "Have you run ./scripts/01-provision-aws.sh yet?"
+    # Check if Terraform state exists
+    if ! terraform_status >/dev/null 2>&1; then
+        log_error "No Terraform state found"
+        log_info "Have you run ./scripts/03-terraform-apply.sh yet?"
         exit 1
     fi
 
-    # Load state
+    # Get instance information from Terraform
     local instance_id
-    instance_id=$(get_state "aws.instance_id")
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
     local region
-    region=$(get_state "aws.region")
+    region=$(get_terraform_output "region" 2>/dev/null || echo "")
 
     if [[ -z "$instance_id" ]]; then
-        log_error "No instance ID found in deployment state"
+        log_error "No instance ID found in Terraform state"
         exit 1
     fi
 
@@ -43,7 +43,10 @@ main() {
 
     # Check current status
     local current_status
-    current_status=$(get_instance_status "$instance_id" "$region")
+    current_status=$(aws ec2 describe-instances \
+        --instance-ids "$instance_id" \
+        --query 'Reservations[0].Instances[0].State.Name' \
+        --output text 2>/dev/null || echo "unknown")
     log_info "Current status: $current_status"
 
     if [[ "$current_status" == "running" ]]; then
@@ -60,7 +63,7 @@ main() {
 
     if [[ "$current_status" == "terminated" ]]; then
         log_error "Instance has been terminated"
-        log_info "You need to provision a new instance with ./scripts/01-provision-aws.sh"
+        log_info "You need to provision a new instance with ./scripts/03-terraform-apply.sh"
         exit 1
     fi
 
@@ -74,7 +77,8 @@ main() {
     fi
 
     # Start instance
-    if ! start_instance "$instance_id" "$region"; then
+    log_info "Starting instance: $instance_id"
+    if ! aws ec2 start-instances --instance-ids "$instance_id" >/dev/null; then
         log_error "Failed to start instance"
         exit 1
     fi
@@ -96,13 +100,11 @@ main() {
 
 wait_for_instance_and_ssh() {
     local instance_id
-    instance_id=$(get_state "aws.instance_id")
-    local region
-    region=$(get_state "aws.region")
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
 
     # Wait for running
     log_info "Waiting for instance to be running..."
-    if ! wait_for_instance_running "$instance_id" "$region"; then
+    if ! aws ec2 wait instance-running --instance-ids "$instance_id"; then
         log_error "Instance failed to start"
         exit 1
     fi
@@ -110,37 +112,48 @@ wait_for_instance_and_ssh() {
     # Get new IP (may have changed)
     log_info "Retrieving new public IP..."
     local public_ip
-    public_ip=$(get_instance_ip "$instance_id" "$region")
+    public_ip=$(aws ec2 describe-instances \
+        --instance-ids "$instance_id" \
+        --query 'Reservations[0].Instances[0].PublicIpAddress' \
+        --output text 2>/dev/null || echo "")
 
-    if [[ -z "$public_ip" ]]; then
+    if [[ -z "$public_ip" || "$public_ip" == "None" ]]; then
         log_error "Failed to get instance public IP"
         exit 1
-    fi
-
-    # Update state with new IP
-    local old_ip
-    old_ip=$(get_state "aws.public_ip")
-    if [[ "$old_ip" != "$public_ip" ]]; then
-        log_info "Public IP changed: $old_ip -> $public_ip"
-        save_state "aws.public_ip" "$public_ip"
     fi
 
     log_success "Instance is running: $public_ip"
 
     # Wait for SSH
     local ssh_key_file
-    ssh_key_file=$(get_state "aws.ssh_key_file")
-    local ssh_user="${SSH_USER:-ubuntu}"
+    ssh_key_file=$(get_terraform_output "ssh_key_file" 2>/dev/null || echo "../keys/jito-validator-key.pem")
+    local ssh_user="ubuntu"
 
     log_info "Waiting for SSH to be available..."
-    if ! wait_for_ssh "${ssh_user}@${public_ip}" "$ssh_key_file" 30 10; then
-        log_error "SSH not available after waiting"
-        log_info "Instance is running but SSH may need more time"
-        log_info "Try connecting manually in a few minutes"
-        exit 1
-    fi
+    local ssh_attempts=0
+    local max_attempts=30
+    
+    while [[ $ssh_attempts -lt $max_attempts ]]; do
+        if ssh -i "$ssh_key_file" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            -o ConnectTimeout=10 \
+            "$ssh_user@$public_ip" \
+            "echo 'SSH connection successful'" >/dev/null 2>&1; then
+            log_success "SSH is ready"
+            return 0
+        fi
+        
+        ssh_attempts=$((ssh_attempts + 1))
+        log_info "SSH attempt $ssh_attempts/$max_attempts failed, retrying in 10s..."
+        sleep 10
+    done
 
-    log_success "SSH is ready"
+    log_error "SSH not available after waiting"
+    log_info "Instance is running but SSH may need more time"
+    log_info "Try connecting manually in a few minutes"
+    exit 1
 }
 
 # ============================================================================
@@ -151,10 +164,8 @@ show_cost_warning() {
     log_section "Cost Warning"
 
     local instance_type
-    instance_type=$(get_state "aws.instance_type")
-
-    local hourly_cost
-    hourly_cost=$(estimate_instance_cost "$instance_type" 1)
+    instance_type=$(get_terraform_output "instance_type" 2>/dev/null || echo "m7i.4xlarge")
+    local hourly_cost="0.81"  # Approximate cost for m7i.4xlarge
 
     echo "${BOLD}Starting the instance will resume charges:${RESET}"
     echo ""
@@ -172,11 +183,16 @@ show_cost_warning() {
 show_connection_info() {
     log_section "Connection Information"
 
+    local instance_id
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
     local public_ip
-    public_ip=$(get_state "aws.public_ip")
+    public_ip=$(aws ec2 describe-instances \
+        --instance-ids "$instance_id" \
+        --query 'Reservations[0].Instances[0].PublicIpAddress' \
+        --output text 2>/dev/null || echo "unknown")
     local ssh_key_file
-    ssh_key_file=$(get_state "aws.ssh_key_file")
-    local ssh_user="${SSH_USER:-ubuntu}"
+    ssh_key_file=$(get_terraform_output "ssh_key_file" 2>/dev/null || echo "../keys/jito-validator-key.pem")
+    local ssh_user="ubuntu"
 
     echo "${BOLD}SSH Connection:${RESET}"
     echo ""

@@ -6,9 +6,9 @@ set -euo pipefail
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=scripts/utils/lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
-# shellcheck source=scripts/lib/terraform-helpers.sh
+# shellcheck source=scripts/utils/lib/terraform-helpers.sh
 source "${SCRIPT_DIR}/lib/terraform-helpers.sh"
 
 # ============================================================================
@@ -23,7 +23,7 @@ main() {
     # Check if Terraform state exists
     if ! terraform_status >/dev/null 2>&1; then
         log_warn "No Terraform state found"
-        log_info "Run ./scripts/01-terraform-init.sh first"
+        log_info "Run ./scripts/infra/init.sh first"
         exit 0
     fi
 
@@ -203,9 +203,9 @@ show_connection_information() {
     # Show control commands
     echo "${BOLD}Control Commands:${RESET}"
     echo ""
-    echo "  ${GREEN}Start instance:${RESET}    ./scripts/start-validator.sh"
-    echo "  ${RED}Stop instance:${RESET}     ./scripts/stop-validator.sh"
-    echo "  ${YELLOW}Destroy all:${RESET}       ./scripts/11-terraform-destroy.sh"
+    echo "  ${GREEN}Start instance:${RESET}    ./scripts/infra/start.sh"
+    echo "  ${RED}Stop instance:${RESET}     ./scripts/infra/stop.sh"
+    echo "  ${YELLOW}Destroy all:${RESET}       ./scripts/infra/destroy.sh"
     echo ""
 }
 

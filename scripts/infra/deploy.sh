@@ -6,10 +6,10 @@ set -euo pipefail
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
-# shellcheck source=scripts/lib/terraform-helpers.sh
-source "${SCRIPT_DIR}/lib/terraform-helpers.sh"
+# shellcheck source=scripts/utils/lib/common.sh
+source "${SCRIPT_DIR}/../utils/lib/common.sh"
+# shellcheck source=scripts/utils/lib/terraform-helpers.sh
+source "${SCRIPT_DIR}/../utils/lib/terraform-helpers.sh"
 
 # ============================================================================
 # Main Function

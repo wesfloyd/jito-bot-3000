@@ -15,35 +15,54 @@ This repo provides a complete automation solution for standing up a Jito Solana 
 
 ## Quick Start
 
-1. **Prerequisites**:
+1. **Setup (First Time)**:
    ```bash
-   # Install Terraform
-   brew install terraform
+   # Install prerequisites
+   ./scripts/utils/setup/local.sh
    
-   # Configure AWS CLI
-   aws configure
+   # Generate SSH keys
+   ./scripts/utils/setup/ssh-keys.sh
    ```
 
 2. **Deploy Infrastructure**:
    ```bash
    # Initialize Terraform
-   ./scripts/01-terraform-init.sh
+   ./scripts/infra/init.sh
    
    # Plan deployment
-   ./scripts/02-terraform-plan.sh
+   ./scripts/infra/plan.sh
    
    # Deploy infrastructure
-   ./scripts/03-terraform-apply.sh
+   ./scripts/infra/deploy.sh
    ```
 
 3. **Monitor & Manage**:
    ```bash
    # Check status
-   ./scripts/10-monitor.sh
+   ./scripts/utils/status.sh
    
-   # Cleanup when done
-   ./scripts/11-terraform-destroy.sh
+   # Stop instance (save costs, keep infrastructure)
+   ./scripts/infra/stop.sh
+   
+   # Start stopped instance
+   ./scripts/infra/start.sh
+   
+   # Complete cleanup (destroy everything)
+   ./scripts/infra/destroy.sh
    ```
+
+## Script Organization
+
+Scripts are organized by functionality in logical folders:
+
+- **`infra/`** - Infrastructure management (Terraform)
+- **`validator/`** - Validator instance management  
+- **`utils/`** - Setup, utilities, and shared libraries
+  - `setup/` - Initial setup and prerequisites
+  - `lib/` - Shared helper functions
+  - Utility scripts for monitoring and maintenance
+
+See `scripts/README.md` for detailed documentation of each script.
 
 ## Configuration
 

@@ -6,12 +6,10 @@ set -euo pipefail
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
-# shellcheck source=scripts/lib/aws-helpers.sh
-source "${SCRIPT_DIR}/lib/aws-helpers.sh"
-# shellcheck source=scripts/lib/solana-helpers.sh
-source "${SCRIPT_DIR}/lib/solana-helpers.sh"
+# shellcheck source=scripts/utils/lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=scripts/utils/lib/solana-helpers.sh
+source "${SCRIPT_DIR}/../lib/solana-helpers.sh"
 
 # ============================================================================
 # Main Function

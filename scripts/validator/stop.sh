@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Stop Validator Instance
-# Stops the EC2 instance to save costs (preserves EBS volumes)
+# Stops the Terraform-managed EC2 instance to save costs (preserves EBS volumes)
 
 set -euo pipefail
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
-# shellcheck source=scripts/lib/aws-helpers.sh
-source "${SCRIPT_DIR}/lib/aws-helpers.sh"
+# shellcheck source=scripts/utils/lib/common.sh
+source "${SCRIPT_DIR}/../utils/lib/common.sh"
+# shellcheck source=scripts/utils/lib/terraform-helpers.sh
+source "${SCRIPT_DIR}/../utils/lib/terraform-helpers.sh"
 
 # ============================================================================
 # Main Function
@@ -20,21 +20,21 @@ main() {
 
     log_section "Stop Validator Instance"
 
-    # Check if deployment state exists
-    if [[ ! -f "$STATE_FILE" ]]; then
-        log_error "Deployment state not found: $STATE_FILE"
-        log_info "Have you run ./scripts/01-provision-aws.sh yet?"
+    # Check if Terraform state exists
+    if ! terraform_status >/dev/null 2>&1; then
+        log_error "No Terraform state found"
+        log_info "Have you run ./scripts/03-terraform-apply.sh yet?"
         exit 1
     fi
 
-    # Load state
+    # Get instance information from Terraform
     local instance_id
-    instance_id=$(get_state "aws.instance_id")
+    instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
     local region
-    region=$(get_state "aws.region")
+    region=$(get_terraform_output "region" 2>/dev/null || echo "")
 
     if [[ -z "$instance_id" ]]; then
-        log_error "No instance ID found in deployment state"
+        log_error "No instance ID found in Terraform state"
         exit 1
     fi
 
@@ -43,7 +43,10 @@ main() {
 
     # Check current status
     local current_status
-    current_status=$(get_instance_status "$instance_id" "$region")
+    current_status=$(aws ec2 describe-instances \
+        --instance-ids "$instance_id" \
+        --query 'Reservations[0].Instances[0].State.Name' \
+        --output text 2>/dev/null || echo "unknown")
     log_info "Current status: $current_status"
 
     if [[ "$current_status" == "stopped" ]]; then
@@ -71,7 +74,8 @@ main() {
     fi
 
     # Stop instance
-    if ! stop_instance "$instance_id" "$region"; then
+    log_info "Stopping instance: $instance_id"
+    if ! aws ec2 stop-instances --instance-ids "$instance_id" >/dev/null; then
         log_error "Failed to stop instance"
         exit 1
     fi
@@ -100,32 +104,15 @@ show_cost_savings() {
 
     # Get instance type
     local instance_type
-    instance_type=$(get_state "aws.instance_type")
-
-    # Get uptime
-    local uptime_hours
-    uptime_hours=$(get_instance_uptime "$instance_id" "$region")
-
-    # Calculate costs
-    local total_cost
-    total_cost=$(estimate_instance_cost "$instance_type" "$uptime_hours")
-
-    echo "${BOLD}Current Session:${RESET}"
-    echo ""
-    echo "  Uptime: ${uptime_hours} hours"
-    printf "  Cost so far: ${YELLOW}\$%.2f${RESET}\n" "$total_cost"
-    echo ""
-
-    # Hourly rate
-    local hourly_cost
-    hourly_cost=$(estimate_instance_cost "$instance_type" 1)
+    instance_type=$(get_terraform_output "instance_type" 2>/dev/null || echo "m7i.4xlarge")
+    local hourly_cost="0.81"  # Approximate cost for m7i.4xlarge
 
     echo "${BOLD}Stopping will save:${RESET}"
     echo ""
     printf "  ${GREEN}\$%.2f per hour${RESET}\n" "$hourly_cost"
     printf "  ${GREEN}\$%.2f per day${RESET}\n" "$(echo "$hourly_cost * 24" | bc -l)"
     echo ""
-    echo "  ${CYAN}Note: EBS storage charges continue (~\$200/month)${RESET}"
+    echo "  ${CYAN}Note: EBS storage charges continue (~\$163.84/month)${RESET}"
     echo ""
 }
 
