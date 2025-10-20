@@ -334,6 +334,122 @@ get_network_connectivity() {
     echo "$testnet_rpc|$jito_block_engine"
 }
 
+get_catchup_status() {
+    local ssh_host=$1
+    local ssh_key=$2
+
+    # Get validator identity
+    local validator_identity
+    validator_identity=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         solana-keygen pubkey ~/validator/keys/validator-keypair.json 2>/dev/null" || echo "")
+
+    if [[ -z "$validator_identity" ]]; then
+        echo "unknown|0|0"
+        return 0
+    fi
+
+    # Check catchup status (with timeout)
+    local catchup_info
+    catchup_info=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         timeout 5 solana catchup $validator_identity 2>&1" || echo "")
+
+    local is_caught_up="false"
+    local slot_distance="unknown"
+    local network_slot="unknown"
+
+    if echo "$catchup_info" | grep -q "has caught up"; then
+        is_caught_up="true"
+        slot_distance="0"
+    elif echo "$catchup_info" | grep -q "Validator is behind"; then
+        is_caught_up="false"
+        # Try to extract slot distance (use sed for portability)
+        slot_distance=$(echo "$catchup_info" | grep -o '[0-9]* slots' | grep -o '[0-9]*' | head -1 || echo "unknown")
+    fi
+
+    # Try to get network slot (use sed for portability)
+    network_slot=$(echo "$catchup_info" | sed -n 's/.*Slot: \([0-9]*\).*/\1/p' || echo "unknown")
+
+    echo "$is_caught_up|$slot_distance|$network_slot"
+}
+
+get_validator_network_status() {
+    local ssh_host=$1
+    local ssh_key=$2
+
+    # Get validator identity
+    local validator_identity
+    validator_identity=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         solana-keygen pubkey ~/validator/keys/validator-keypair.json 2>/dev/null" || echo "")
+
+    if [[ -z "$validator_identity" ]]; then
+        echo "unknown|no|0|0"
+        return 0
+    fi
+
+    # Check if validator is in network list
+    local validator_info
+    validator_info=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         timeout 10 solana validators -ut 2>&1 | grep $validator_identity || echo ''" || echo "")
+
+    local in_network="no"
+    local stake="0"
+    local last_vote="0"
+
+    if [[ -n "$validator_info" ]]; then
+        in_network="yes"
+        # Extract stake (column varies, look for SOL or lamports)
+        stake=$(echo "$validator_info" | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9.]+$/ && $(i+1) ~ /SOL/) print $i}' || echo "0")
+        # Extract last vote slot
+        last_vote=$(echo "$validator_info" | awk '{print $(NF-2)}' || echo "0")
+    fi
+
+    echo "$validator_identity|$in_network|$stake|$last_vote"
+}
+
+get_stake_info() {
+    local ssh_host=$1
+    local ssh_key=$2
+
+    # Get vote account pubkey
+    local vote_account
+    vote_account=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         solana-keygen pubkey ~/validator/keys/vote-account-keypair.json 2>/dev/null" || echo "")
+
+    if [[ -z "$vote_account" ]]; then
+        echo "0|0|0"
+        return 0
+    fi
+
+    # Try to get stake info (this may fail if no stake)
+    local stake_info
+    stake_info=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$PATH\" && \
+         timeout 5 solana stakes $vote_account -ut 2>&1" || echo "")
+
+    local active_stake="0"
+    local activating_stake="0"
+    local deactivating_stake="0"
+
+    if echo "$stake_info" | grep -q "Active Stake"; then
+        active_stake=$(echo "$stake_info" | grep "Active Stake" | awk '{print $3}' || echo "0")
+    fi
+
+    if echo "$stake_info" | grep -q "Activating Stake"; then
+        activating_stake=$(echo "$stake_info" | grep "Activating Stake" | awk '{print $3}' || echo "0")
+    fi
+
+    if echo "$stake_info" | grep -q "Deactivating Stake"; then
+        deactivating_stake=$(echo "$stake_info" | grep "Deactivating Stake" | awk '{print $3}' || echo "0")
+    fi
+
+    echo "$active_stake|$activating_stake|$deactivating_stake"
+}
+
 # ============================================================================
 # Display Functions
 # ============================================================================
@@ -551,6 +667,71 @@ display_full_status() {
         log_warn "  No log files found"
     fi
 
+    # Validator Network Status (only in full mode)
+    echo ""
+    log_subsection "Validator Network Status"
+    log_info "Checking network status (this may take 10-15 seconds)..."
+
+    local catchup_info
+    catchup_info=$(get_catchup_status "$ssh_host" "$ssh_key")
+    local is_caught_up
+    is_caught_up=$(echo "$catchup_info" | cut -d'|' -f1)
+    local slot_distance
+    slot_distance=$(echo "$catchup_info" | cut -d'|' -f2)
+
+    if [[ "$is_caught_up" == "true" ]]; then
+        log_success "  Catchup Status:  CAUGHT UP"
+    elif [[ "$slot_distance" != "unknown" && "$slot_distance" != "0" ]]; then
+        log_warn "  Catchup Status:  CATCHING UP ($slot_distance slots behind)"
+    else
+        log_warn "  Catchup Status:  CHECKING... (validator may still be starting)"
+    fi
+
+    local network_status
+    network_status=$(get_validator_network_status "$ssh_host" "$ssh_key")
+    local validator_id
+    validator_id=$(echo "$network_status" | cut -d'|' -f1)
+    local in_network
+    in_network=$(echo "$network_status" | cut -d'|' -f2)
+    local last_vote
+    last_vote=$(echo "$network_status" | cut -d'|' -f4)
+
+    echo "  Validator ID:    $validator_id"
+
+    if [[ "$in_network" == "yes" ]]; then
+        log_success "  Network Status:  IN VALIDATOR LIST"
+        if [[ "$last_vote" != "0" && "$last_vote" != "unknown" ]]; then
+            echo "  Last Vote Slot:  $last_vote"
+        fi
+    else
+        log_warn "  Network Status:  NOT IN VALIDATOR LIST YET"
+        log_info "  Note: Validator must catch up before appearing in network list"
+    fi
+
+    # Stake Information
+    echo ""
+    log_subsection "Stake Information"
+    local stake_info
+    stake_info=$(get_stake_info "$ssh_host" "$ssh_key")
+    local active_stake
+    active_stake=$(echo "$stake_info" | cut -d'|' -f1)
+    local activating_stake
+    activating_stake=$(echo "$stake_info" | cut -d'|' -f2)
+
+    if [[ "$active_stake" != "0" ]]; then
+        log_success "  Active Stake:    $active_stake SOL"
+    else
+        log_warn "  Active Stake:    0 SOL (validator will not receive leader slots)"
+    fi
+
+    if [[ "$activating_stake" != "0" ]]; then
+        echo "  Activating:      $activating_stake SOL"
+    fi
+
+    if [[ "$active_stake" == "0" && "$activating_stake" == "0" ]]; then
+        log_info "  To add stake, delegate SOL to vote account: $validator_id"
+    fi
+
     # Quick Actions
     echo ""
     log_subsection "Quick Actions"
@@ -558,6 +739,8 @@ display_full_status() {
     echo "  Check health:    ./scripts/validator/launch.sh health"
     echo "  Stop validator:  ./scripts/validator/launch.sh stop"
     echo "  Start validator: ./scripts/validator/launch.sh start"
+    echo ""
+    echo "  Solana Explorer: https://explorer.solana.com/address/$validator_id?cluster=testnet"
 }
 
 # ============================================================================
