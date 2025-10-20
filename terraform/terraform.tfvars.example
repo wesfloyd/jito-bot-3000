@@ -1,0 +1,32 @@
+# ============================================================================
+# Terraform Variables for Jito Validator Deployment
+# Copy this file to terraform.tfvars and modify as needed
+# ============================================================================
+
+# AWS Configuration
+aws_region = "us-west-1"
+
+# EC2 Instance Configuration
+instance_type  = "m7i.4xlarge"  # Options: m7i.4xlarge, m7i.2xlarge, m7i-flex.4xlarge
+instance_name  = "jito-testnet-validator"
+ssh_user       = "ubuntu"
+
+# Storage Configuration
+volume_size       = 2048  # GB - minimum 2TB recommended for validator
+volume_type       = "gp3" # Options: gp2, gp3, io1, io2
+volume_iops       = 16000 # For gp3 volumes only (3000-16000)
+volume_throughput = 1000  # For gp3 volumes only (125-1000 MB/s)
+
+# Network Configuration
+key_name             = "jito-validator-key"
+security_group_name  = "jito-validator-sg"
+admin_cidr           = ""  # Leave empty to auto-detect your IP, or set to "x.x.x.x/32"
+vpc_id               = ""  # Leave empty to use default VPC, or set to specific VPC ID
+
+# Auto-Stop Configuration
+auto_stop_hours = 8  # Set to 0 to disable auto-stop
+
+# Paths and Directories
+keys_dir     = "../keys"
+project_name = "jito-validator"
+environment  = "testnet"

@@ -10,3 +10,8 @@ This repo exists to help maximally automate the process of standing up a jito so
 
 - https://docs.jito.wtf/
 - https://github.com/jito-foundation/jito-solana
+
+
+## Roadmap
+
+Modify to use Terraform for AWS infra provisioning.

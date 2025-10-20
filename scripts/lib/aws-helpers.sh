@@ -239,8 +239,8 @@ launch_ec2_instance() {
     log_info "  Storage: ${volume_size}GB" >&2
 
     # Get subnet ID for the VPC in a supported AZ
-    local subnet_id
-    if [[ -n "$vpc_id" ]]; then
+    local subnet_id=""
+    if [[ -n "${vpc_id:-}" ]]; then
         # Get supported availability zones for this instance type
         local supported_azs
         supported_azs=$(aws ec2 describe-instance-type-offerings \
@@ -252,29 +252,22 @@ launch_ec2_instance() {
         
         log_info "Supported AZs for $instance_type: $supported_azs" >&2
         
-        # Find a subnet in a supported AZ
-        subnet_id=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$vpc_id" \
-            --region "$region" \
-            --query "Subnets[?AvailabilityZone==\`$(echo $supported_azs | awk '{print $1}')\`].SubnetId" \
-            --output text)
-        
-        # If first AZ doesn't work, try others
-        if [[ -z "$subnet_id" || "$subnet_id" == "None" ]]; then
-            for az in $supported_azs; do
-                subnet_id=$(aws ec2 describe-subnets \
-                    --filters "Name=vpc-id,Values=$vpc_id" \
-                    --region "$region" \
-                    --query "Subnets[?AvailabilityZone==\`$az\`].SubnetId" \
-                    --output text)
-                if [[ -n "$subnet_id" && "$subnet_id" != "None" ]]; then
-                    break
-                fi
-            done
-        fi
+        # Find a subnet in a supported AZ - try all supported AZs
+        subnet_id=""
+        for az in $supported_azs; do
+            subnet_id=$(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=${vpc_id:-}" \
+                --region "$region" \
+                --query "Subnets[?AvailabilityZone==\`$az\`].SubnetId" \
+                --output text)
+            if [[ -n "$subnet_id" && "$subnet_id" != "None" ]]; then
+                log_info "Selected subnet in AZ: $az" >&2
+                break
+            fi
+        done
         
         if [[ -z "$subnet_id" || "$subnet_id" == "None" ]]; then
-            log_error "No subnet found in VPC $vpc_id for supported AZs: $supported_azs" >&2
+            log_error "No subnet found in VPC ${vpc_id:-} for supported AZs: $supported_azs" >&2
             return 1
         fi
         log_info "  Subnet: $subnet_id" >&2

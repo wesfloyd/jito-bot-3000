@@ -19,6 +19,17 @@ aws-ssh-key*
 # Deployment State
 # ============================================================================
 
+# Terraform state files
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.lock.info
+.terraform/
+.terraform.lock.hcl
+
+# Terraform variable files (may contain sensitive data)
+terraform.tfvars
+*.auto.tfvars
+
 # Deployment state file contains IPs and instance IDs
 deployment.state
 *.state
