@@ -169,6 +169,15 @@ COMMIT_HASH=\$(git rev-parse --short HEAD)
 log_info "Building from commit: \$COMMIT_HASH"
 
 # ============================================================================
+# Initialize Submodules
+# ============================================================================
+
+log_info "Initializing Git submodules..."
+git submodule update --init --recursive
+
+log_success "Submodules initialized"
+
+# ============================================================================
 # Build Validator
 # ============================================================================
 
@@ -180,7 +189,8 @@ echo ""
 export RUSTFLAGS="-C target-cpu=native"
 
 # Build with release profile
-if cargo build --release --bin solana-validator; then
+# Note: Binary name changed from solana-validator to agave-validator in v2.x
+if cargo build --release --bin agave-validator; then
     log_success "Validator binary built successfully"
 else
     log_error "Build failed"
@@ -197,9 +207,12 @@ log_info "Installing binaries..."
 mkdir -p "\$HOME/.local/bin"
 
 # Copy binaries
-cp target/release/solana-validator "\$HOME/.local/bin/"
+cp target/release/agave-validator "\$HOME/.local/bin/"
 cp target/release/solana "\$HOME/.local/bin/" 2>/dev/null || true
 cp target/release/solana-keygen "\$HOME/.local/bin/" 2>/dev/null || true
+
+# Create symlink for backward compatibility
+ln -sf "\$HOME/.local/bin/agave-validator" "\$HOME/.local/bin/solana-validator" 2>/dev/null || true
 
 # Add to PATH if not already there
 if ! grep -q ".local/bin" "\$HOME/.bashrc"; then
@@ -209,8 +222,8 @@ fi
 export PATH="\$HOME/.local/bin:\$PATH"
 
 # Verify installation
-if command -v solana-validator >/dev/null 2>&1; then
-    VALIDATOR_VERSION=\$(solana-validator --version | head -1)
+if command -v agave-validator >/dev/null 2>&1; then
+    VALIDATOR_VERSION=\$(agave-validator --version | head -1)
     log_success "Jito-Solana validator installed: \$VALIDATOR_VERSION"
 else
     log_error "Validator installation verification failed"
@@ -227,7 +240,7 @@ echo "  Commit: \$COMMIT_HASH"
 echo "  Binary: \$HOME/.local/bin/solana-validator"
 
 # Check binary size
-BINARY_SIZE=\$(du -h "\$HOME/.local/bin/solana-validator" | cut -f1)
+BINARY_SIZE=\$(du -h "\$HOME/.local/bin/agave-validator" | cut -f1)
 echo "  Size: \$BINARY_SIZE"
 
 # ============================================================================

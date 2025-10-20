@@ -230,10 +230,12 @@ resource "aws_instance" "jito_validator" {
 
 ### 5.2 Jito-Solana Compilation Scripts
 - [x] Create `scripts/validator/build.sh` for Jito-Solana compilation
-- [ ] Clone Jito-Solana repository (done via build script)
-- [ ] Build validator binary (done via build script)
-- [ ] Install validator binary (done via build script)
-- [ ] Verify installation (done via build script)
+- [x] Clone Jito-Solana repository (done via build script)
+- [x] Initialize Git submodules (anchor, jito-programs, jito-protos)
+- [x] Update build script to use `agave-validator` binary name (v2.x change)
+- [ ] Build validator binary (IN PROGRESS - currently compiling)
+- [ ] Install validator binary (pending build completion)
+- [ ] Verify installation (pending build completion)
 
 ---
 
