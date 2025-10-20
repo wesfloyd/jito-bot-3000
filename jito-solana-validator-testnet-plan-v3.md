@@ -41,24 +41,24 @@ scripts/
 │   ├── deploy.sh              # Apply infrastructure
 │   ├── start.sh               # Start stopped infrastructure
 │   ├── stop.sh                # Stop infrastructure (save costs)
-│   └── destroy.sh             # Cleanup infrastructure
+│   ├── status.sh              # Infrastructure status checks
+│   ├── destroy.sh             # Cleanup infrastructure
+│   └── README.md              # Infrastructure documentation
 ├── validator/                  # Validator management
 │   ├── start.sh               # Start validator instance
 │   ├── stop.sh                # Stop validator instance
-│   ├── setup.sh               # Remote VM setup via SSH
-│   ├── build.sh               # Jito-Solana compilation on VM
-│   ├── configure.sh           # Generate validator.sh script
-│   └── launch.sh              # Start validator and verify
-└── utils/                      # Utilities, setup, and shared libraries
-    ├── setup/                  # Initial setup scripts
-    │   ├── local.sh           # Local prerequisites and Terraform setup
-    │   └── ssh-keys.sh        # SSH keypair generation
-    ├── lib/                    # Shared libraries
-    │   ├── common.sh          # Shared functions, logging, error handling
-    │   ├── terraform-helpers.sh # Terraform-specific utilities
-    │   └── solana-helpers.sh  # Solana CLI wrappers
-    ├── status.sh              # Health checks and monitoring
-    └── fund-accounts.sh       # Testnet SOL funding automation
+│   └── README.md              # Validator documentation
+├── utils/                      # Utilities, setup, and shared libraries
+│   ├── setup/                  # Initial setup scripts
+│   │   ├── local.sh           # Local prerequisites and Terraform setup
+│   │   └── ssh-keys.sh        # SSH keypair generation
+│   └── lib/                    # Shared libraries
+│       ├── common.sh          # Shared functions, logging, error handling
+│       ├── terraform-helpers.sh # Terraform-specific utilities
+│       └── solana-helpers.sh  # Solana CLI wrappers
+├── logs/                       # Runtime logs
+│   └── deployment-{timestamp}.log
+└── README.md                   # Scripts documentation
 
 config/
 ├── terraform.tfvars           # Terraform variables (gitignored)
@@ -69,9 +69,6 @@ keys/                          # Created at runtime, gitignored
 ├── validator-keypair.json
 ├── vote-account-keypair.json
 └── authorized-withdrawer-keypair.json
-
-logs/                          # Created at runtime
-└── deployment-{timestamp}.log
 
 terraform.tfstate              # Terraform state (gitignored)
 terraform.tfstate.backup       # Terraform state backup (gitignored)
@@ -200,19 +197,21 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 3: Key Management (Bash)
+## Phase 3: Key Management (Bash) ✅ COMPLETED
 
 ### 3.1 Local Key Generation
-- [ ] Generate validator keypair
-- [ ] Generate vote account keypair  
-- [ ] Generate authorized withdrawer keypair
-- [ ] Store keys securely in keys/ directory
+- [x] Generate validator keypair
+- [x] Generate vote account keypair
+- [x] Generate authorized withdrawer keypair
+- [x] Store keys securely in keys/ directory
+- [x] Create `scripts/utils/generate-keys.sh` for automated key generation
 
 ---
 
 ## Phase 4: Account Funding (Bash)
 
 ### 4.1 Testnet SOL Funding
+- [ ] Create `scripts/utils/fund-accounts.sh` for SOL funding automation
 - [ ] Connect to testnet
 - [ ] Request SOL airdrop for validator account
 - [ ] Request SOL airdrop for vote account
@@ -223,12 +222,13 @@ resource "aws_instance" "jito_validator" {
 ## Phase 5: Validator Setup (SSH + Bash)
 
 ### 5.1 Remote VM Configuration
-- [ ] SSH to provisioned instance
+- [ ] Create `scripts/validator/setup.sh` for SSH to provisioned instance
 - [ ] Update system packages
 - [ ] Install required dependencies (Rust, build tools)
 - [ ] Configure system settings
 
 ### 5.2 Jito-Solana Compilation
+- [ ] Create `scripts/validator/build.sh` for Jito-Solana compilation
 - [ ] Clone Jito-Solana repository
 - [ ] Build validator binary
 - [ ] Install validator binary
@@ -239,6 +239,7 @@ resource "aws_instance" "jito_validator" {
 ## Phase 6: Validator Configuration (Bash)
 
 ### 6.1 Configuration Generation
+- [ ] Create `scripts/validator/configure.sh` for configuration generation
 - [ ] Generate validator.sh script from template
 - [ ] Configure RPC endpoints
 - [ ] Set up logging configuration
@@ -249,6 +250,7 @@ resource "aws_instance" "jito_validator" {
 ## Phase 7: Validator Launch (Bash)
 
 ### 7.1 Validator Startup
+- [ ] Create `scripts/validator/launch.sh` for validator startup
 - [ ] Start validator service
 - [ ] Verify validator is running
 - [ ] Check validator logs
@@ -259,6 +261,7 @@ resource "aws_instance" "jito_validator" {
 ## Phase 8: Monitoring & Management (Bash)
 
 ### 8.1 Health Monitoring
+- [ ] Create `scripts/utils/status.sh` for health checks
 - [ ] Implement health checks
 - [ ] Set up log monitoring
 - [ ] Create status dashboard
