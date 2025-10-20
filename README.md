@@ -63,6 +63,12 @@ Follow these steps in order to deploy a complete Jito validator on testnet:
 
 **Note**: Infrastructure includes auto-stop after 8 hours to prevent runaway costs. The instance can be restarted with `./scripts/infra/start.sh`.
 
+**Security Groups**: The deployment creates security groups with:
+- UDP ports 8000-8020 (Solana gossip)
+- TCP ports 8000-8020 (Solana gossip)
+- TCP ports 8899-8900 (RPC endpoints)
+- TCP port 22 (SSH from your IP only)
+
 #### 3. Remote Validator Setup
 ```bash
 # Configure remote instance (dependencies, Rust, Solana CLI, system tuning)
@@ -196,6 +202,24 @@ Edit `terraform/terraform.tfvars` to customize:
 1. **High disk usage**: Monitor with `./scripts/utils/status.sh --full`
 2. **Slow catchup**: Normal for initial sync, check logs for progress
 3. **Memory issues**: Ensure instance type has sufficient RAM (64GB+ recommended)
+
+### Port Configuration Issues
+
+1. **TCP port warnings** (`Received no response at tcp/8899`):
+   - These warnings are **expected and normal** for validators behind NAT/firewall
+   - The validator checks if external services can reach TCP ports 8899, 8900, and 8000
+   - UDP ports are what matter for validator operation (8000-8020)
+   - TCP port errors do NOT prevent the validator from functioning
+
+2. **RPC ports not accessible**:
+   - If you need external RPC access, ensure security group has TCP 8899-8900 open
+   - Check security group: `aws ec2 describe-security-groups --group-ids <sg-id> --region us-west-1`
+   - Add ports if missing: `aws ec2 authorize-security-group-ingress --group-id <sg-id> --region us-west-1 --ip-permissions IpProtocol=tcp,FromPort=8899,ToPort=8900,IpRanges='[{CidrIp=0.0.0.0/0}]'`
+
+3. **Validator crash-looping**:
+   - Check logs for actual errors: `./scripts/validator/launch.sh logs`
+   - Verify script syntax: `ssh <validator> 'bash -n ~/validator/start-validator.sh'`
+   - Check systemd status: `ssh <validator> 'sudo systemctl status jito-validator'`
 
 ### Getting Help
 
