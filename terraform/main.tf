@@ -128,13 +128,13 @@ resource "aws_security_group" "jito_validator" {
   }
 
   # RPC port (optional - uncomment if needed)
-  # ingress {
-  #   description = "RPC from admin IP"
-  #   from_port   = 8899
-  #   to_port     = 8899
-  #   protocol    = "tcp"
-  #   cidr_blocks = [local.admin_cidr]
-  # }
+  ingress {
+    description = "RPC endpoint"
+    from_port   = 8899
+    to_port     = 8900
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Use local.admin_cidr to restrict to your IP only
+  }
 
   # All outbound traffic
   egress {

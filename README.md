@@ -15,41 +15,126 @@ This repo provides a complete automation solution for standing up a Jito Solana 
 
 ## Quick Start
 
-1. **Setup (First Time)**:
-   ```bash
-   # Install prerequisites
-   ./scripts/utils/setup/local.sh
-   
-   # Generate SSH keys
-   ./scripts/utils/setup/ssh-keys.sh
-   ```
+### Prerequisites
 
-2. **Deploy Infrastructure**:
-   ```bash
-   # Initialize Terraform
-   ./scripts/infra/init.sh
-   
-   # Plan deployment
-   ./scripts/infra/plan.sh
-   
-   # Deploy infrastructure
-   ./scripts/infra/deploy.sh
-   ```
+- AWS CLI configured with credentials
+- Solana CLI installed locally
+- Terraform (auto-installed by setup script)
+- SSH client
 
-3. **Monitor & Manage**:
-   ```bash
-   # Check status
-   ./scripts/utils/status.sh
-   
-   # Stop instance (save costs, keep infrastructure)
-   ./scripts/infra/stop.sh
-   
-   # Start stopped instance
-   ./scripts/infra/start.sh
-   
-   # Complete cleanup (destroy everything)
-   ./scripts/infra/destroy.sh
-   ```
+### Complete Deployment (End-to-End)
+
+Follow these steps in order to deploy a complete Jito validator on testnet:
+
+#### 1. Local Setup & Key Generation
+```bash
+# Install prerequisites and Terraform
+./scripts/utils/setup/local.sh
+
+# Generate SSH keys for EC2 access
+./scripts/utils/setup/ssh-keys.sh
+
+# Generate Solana validator keypairs (validator identity, vote account, withdrawer)
+./scripts/utils/generate-keys.sh --force
+
+# Fund accounts on testnet (5 SOL validator, 1 SOL vote account)
+# Use solana faucet at: https://faucet.solana.com/ w/ Testnet
+./scripts/utils/fund-accounts.sh --force
+```
+
+**Expected Output**: Three keypairs generated in `keys/`, accounts funded on testnet
+
+#### 2. Infrastructure Deployment
+```bash
+# Initialize Terraform
+./scripts/infra/init.sh
+
+# Preview infrastructure changes
+./scripts/infra/plan.sh
+
+# Deploy AWS infrastructure (EC2 instance, security groups, networking)
+./scripts/infra/deploy.sh
+```
+
+**Expected Output**: EC2 instance running in AWS, SSH access configured
+
+**Note**: Infrastructure includes auto-stop after 8 hours to prevent runaway costs. The instance can be restarted with `./scripts/infra/start.sh`.
+
+#### 3. Remote Validator Setup
+```bash
+# Configure remote instance (dependencies, Rust, Solana CLI, system tuning)
+./scripts/validator/setup.sh --force
+
+# Build Jito-Solana validator binary (takes ~7 minutes)
+./scripts/validator/build.sh --force
+
+# Upload validator keypairs to remote instance
+./scripts/validator/upload-keys.sh --force
+```
+
+**Expected Output**: Remote instance configured with all dependencies, Jito validator binary compiled
+
+#### 4. Validator Configuration & Launch
+```bash
+# Generate validator configuration and startup script
+./scripts/validator/configure.sh --force
+
+# Create vote account on-chain
+./scripts/validator/create-vote-account.sh --force
+
+# Start the validator
+./scripts/validator/launch.sh start
+```
+
+**Expected Output**: Validator running, vote account created, catching up with network
+
+#### 5. Monitor & Verify
+```bash
+# Quick status check
+./scripts/utils/status.sh
+
+# Comprehensive status with all metrics
+./scripts/utils/status.sh --full
+
+# Continuous monitoring (refreshes every 30s)
+./scripts/utils/status.sh --watch
+
+# View live validator logs
+./scripts/validator/launch.sh logs --follow
+
+# Check validator health
+./scripts/validator/launch.sh health
+```
+
+**Expected Output**: Validator status showing RUNNING, vote account with credits accumulating
+
+### Lifecycle Management
+
+```bash
+# Stop validator (validator only, instance keeps running)
+./scripts/validator/launch.sh stop
+
+# Start validator
+./scripts/validator/launch.sh start
+
+# Restart validator
+./scripts/validator/launch.sh restart
+
+# Check validator status
+./scripts/validator/launch.sh status
+
+# Stop EC2 instance (save costs, keep infrastructure)
+./scripts/infra/stop.sh
+
+# Start stopped EC2 instance
+./scripts/infra/start.sh
+
+# Check infrastructure status
+./scripts/infra/status.sh
+
+# Complete cleanup (destroy all AWS resources)
+./scripts/infra/destroy.sh
+```
 
 ## Script Organization
 
@@ -71,6 +156,50 @@ Edit `terraform/terraform.tfvars` to customize:
 - Storage configuration
 - Auto-stop settings
 - Network configuration
+
+## Troubleshooting
+
+### Validator Not Starting
+
+1. **Check logs**: `./scripts/validator/launch.sh logs`
+2. **Verify keypairs uploaded**: Check `~/validator/keys/` on remote instance
+3. **Check vote account**: `./scripts/validator/launch.sh health`
+4. **Verify RPC connectivity**: May take 5-10 minutes after startup
+
+### Infrastructure Issues
+
+1. **SSH connection failed**:
+   - Check security group allows your IP
+   - Verify instance is running: `./scripts/infra/status.sh`
+   - Check SSH key permissions: `chmod 400 keys/*.pem`
+
+2. **Terraform state issues**:
+   - Ensure `terraform/terraform.tfstate` exists
+   - Re-initialize if needed: `./scripts/infra/init.sh`
+
+### Account Funding Issues
+
+1. **Testnet faucet rate limits**:
+   - The script will provide web faucet URLs as fallback
+   - Use multiple faucets if one is rate-limited
+   - Wait 1-2 hours between requests
+
+2. **Insufficient balance**:
+   - Vote account creation requires ~0.03 SOL
+   - Validator requires minimum 5 SOL to start
+
+### Performance Issues
+
+1. **High disk usage**: Monitor with `./scripts/utils/status.sh --full`
+2. **Slow catchup**: Normal for initial sync, check logs for progress
+3. **Memory issues**: Ensure instance type has sufficient RAM (64GB+ recommended)
+
+### Getting Help
+
+- Check validator logs: `./scripts/validator/launch.sh logs --follow`
+- Review configuration: `cat ~/validator/start-validator.sh` on remote instance
+- Jito documentation: https://docs.jito.wtf/
+- Solana documentation: https://docs.solana.com/
 
 ## Key Features
 

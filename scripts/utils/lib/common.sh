@@ -7,8 +7,10 @@ set -euo pipefail
 # Configuration
 # ============================================================================
 
-# Root directory of the project
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Root directory of the project (only set if not already defined)
+if [[ -z "${PROJECT_ROOT:-}" ]]; then
+    PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
 
 # Default paths
 KEYS_DIR="${PROJECT_ROOT}/keys"
@@ -81,6 +83,11 @@ log_section() {
     echo "${BOLD}${CYAN}  $message${RESET}" | tee -a "$LOG_FILE"
     echo "${BOLD}${CYAN}========================================${RESET}" | tee -a "$LOG_FILE"
     echo ""
+}
+
+log_subsection() {
+    local message=$1
+    echo "${BOLD}${CYAN}$message${RESET}" | tee -a "$LOG_FILE"
 }
 
 # ============================================================================
