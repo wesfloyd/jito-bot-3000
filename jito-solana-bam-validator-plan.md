@@ -357,90 +357,16 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 9: BAM Integration (Block Assembly Marketplace)
+## Phase 9: BAM Configuration
 
-### 9.1 What is BAM?
+### 9.1 Prerequisites Check
+- [ ] Verify validator is fully operational on testnet
+- [ ] Confirm validator has stake and receives leader slots
+- [ ] Check available disk space (RPC tx history requires additional storage)
 
-**BAM (Block Assembly Marketplace)** is Jito's next-generation block building system that brings private, verifiable block construction to Solana. BAM introduces trusted execution environments (TEEs) and attestations to enable tamper-proof transaction ordering, protecting against MEV and mempool attacks.
-
-**Key Benefits:**
-- **Private Transaction Ordering**: Transactions are processed in a secure, private environment
-- **Verifiable Block Building**: Cryptographic attestations prove blocks were built correctly
-- **Enhanced Security**: TEE-based architecture prevents manipulation
-- **Programmable Sequencing**: Future support for custom ordering logic
-
-### 9.2 BAM Architecture Overview
-
-BAM consists of two main components:
-
-1. **BAM Nodes**: Off-chain block builders running in Trusted Execution Environments (TEEs)
-   - Receive transactions from searchers and users
-   - Assemble blocks according to specified rules
-   - Provide cryptographic attestations of proper execution
-   - Send ordered transaction bundles to validators
-
-2. **BAM Validators**: On-chain validators running updated Jito-Solana client
-   - Receive ordered transactions from BAM Nodes
-   - Execute transactions as instructed
-   - Must be in the leader schedule to participate
-   - Report metrics back to BAM infrastructure
-
----
-
-## Phase 10: BAM Testnet Enablement
-
-### 10.1 BAM Testnet Status
-
-**Current Status (as of January 2025):**
-- ✅ BAM is **LIVE on testnet**
-- ✅ Initial set of validators running BAM client
-- ⏳ Public testnet access coming soon
-- ⏳ Mainnet deployment planned after testnet validation
-
-**Important Notes:**
-- BAM testnet is currently running with an initial validator cluster
-- Public testnet participation will open soon
-- Mainnet deployment will follow testnet validation
-- Validators must be in the leader schedule to connect to BAM
-
-### 10.2 Prerequisites for BAM Integration
-
-Before enabling BAM, ensure:
-- [ ] Jito-Solana validator is fully operational on testnet
-- [ ] Validator is in the leader schedule (BAM only connects to scheduled leaders)
-- [ ] Sufficient stake to receive leader slots regularly
-- [ ] RPC transaction history enabled on the validator
-- [ ] Network connectivity to BAM nodes
-
-### 10.3 BAM Configuration Requirements
-
-To enable BAM on your Jito-Solana validator, you must add **two mandatory flags**:
-
-#### Required Configuration Flags
-
+### 9.2 Configuration File
+- [ ] Create `config/bam-config.env`:
 ```bash
-# 1. BAM Node Connection
---bam-url http://ny.testnet.bam.jito.wtf
-
-# 2. Enable RPC Transaction History (required for fee payment confirmation)
---enable-rpc-transaction-history
-```
-
-#### Optional: Metrics Collection
-
-To enable metrics reporting to BAM infrastructure:
-
-```bash
-# Export metrics configuration
-export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"
-```
-
-### 10.4 Implementation Steps
-
-#### Step 1: Create BAM Configuration File
-- [ ] Create `config/bam-config.env` with BAM-specific settings
-```bash
-# config/bam-config.env
 BAM_URL="http://ny.testnet.bam.jito.wtf"
 BAM_METRICS_HOST="http://bam-public-metrics.jito.wtf:8086"
 BAM_METRICS_DB="testnet-bam-validators"
@@ -448,124 +374,63 @@ BAM_METRICS_USER="testnet-bam-validator"
 BAM_METRICS_PASSWORD="wambamdamn"
 ```
 
-#### Step 2: Update Validator Launch Script
-- [ ] Modify `scripts/validator/launch.sh` or validator template to include BAM flags
-- [ ] Add conditional logic to enable/disable BAM via environment variable
-```bash
-# Example addition to validator launch script
-if [ "${ENABLE_BAM}" = "true" ]; then
-  BAM_FLAGS="--bam-url ${BAM_URL} --enable-rpc-transaction-history"
+### 9.3 Validator Configuration Script
+- [ ] Create `scripts/validator/configure-bam.sh`
+- [ ] Check validator is in leader schedule before enabling
+- [ ] Validate storage capacity for RPC transaction history
+- [ ] Update Terraform `root_block_device` size if needed
 
-  # Set metrics if configured
-  if [ -n "${BAM_METRICS_HOST}" ]; then
-    export SOLANA_METRICS_CONFIG="host=${BAM_METRICS_HOST},db=${BAM_METRICS_DB},u=${BAM_METRICS_USER},p=${BAM_METRICS_PASSWORD}"
-  fi
-else
-  BAM_FLAGS=""
-fi
+---
+
+## Phase 10: BAM Integration
+
+### 10.1 Update Validator Launch Configuration
+- [ ] Modify `scripts/validator/configure.sh` to add BAM flags conditionally
+- [ ] Add `--bam-url http://ny.testnet.bam.jito.wtf`
+- [ ] Add `--enable-rpc-transaction-history`
+- [ ] Add metrics export if enabled:
+```bash
+export SOLANA_METRICS_CONFIG="host=${BAM_METRICS_HOST},db=${BAM_METRICS_DB},u=${BAM_METRICS_USER},p=${BAM_METRICS_PASSWORD}"
 ```
 
-#### Step 3: Update Validator Configuration Script
-- [ ] Create `scripts/validator/configure-bam.sh` for BAM-specific configuration
-- [ ] Add logic to check validator is in leader schedule before enabling BAM
-- [ ] Validate RPC transaction history requirements
+### 10.2 Enable/Disable Toggle
+- [ ] Add environment variable `ENABLE_BAM` (default: false)
+- [ ] Implement conditional BAM flags in startup script
+- [ ] Test validator startup with BAM disabled (default)
+- [ ] Test validator startup with BAM enabled
 
-#### Step 4: Enable RPC Transaction History
-- [ ] Ensure validator has sufficient storage for transaction history
-  - Transaction history can consume significant disk space
-  - Consider adding `--enable-extended-tx-metadata-storage` for full history
-- [ ] Update root_block_device size in Terraform if needed
-- [ ] Monitor disk usage after enabling
-
-#### Step 5: Verify BAM Connection
-- [ ] Create `scripts/utils/verify-bam.sh` for BAM connectivity checks
-- [ ] Check validator logs for BAM connection messages
-- [ ] Verify metrics are being reported (if configured)
-- [ ] Monitor for BAM-related errors
+### 10.3 Deploy BAM Configuration
+- [ ] Restart validator with BAM flags enabled
+- [ ] Monitor logs for BAM connection messages
+- [ ] Verify BAM endpoint connectivity
 
 ---
 
 ## Phase 11: BAM Monitoring & Validation
 
-### 11.1 BAM Health Checks
-- [ ] Add BAM connection status to `scripts/utils/status.sh`
-- [ ] Monitor BAM node connectivity
-- [ ] Track transaction processing through BAM
-- [ ] Verify block building attestations
+### 11.1 Connection Verification
+- [ ] Create `scripts/utils/verify-bam.sh`
+- [ ] Check BAM node connectivity (`http://ny.testnet.bam.jito.wtf`)
+- [ ] Verify metrics submission to BAM infrastructure
+- [ ] Monitor validator logs for BAM connection status
 
-### 11.2 BAM Metrics Monitoring
-- [ ] Monitor metrics submissions to BAM infrastructure
+### 11.2 Status Script Updates
+- [ ] Update `scripts/utils/status.sh` with BAM checks:
+  - [ ] BAM connection status
+  - [ ] BAM endpoint health
+  - [ ] Metrics reporting status
+  - [ ] Leader slot utilization
+
+### 11.3 Monitoring & Alerts
 - [ ] Track BAM-specific performance metrics
+- [ ] Monitor disk usage (RPC transaction history)
 - [ ] Set up alerts for BAM disconnections
-- [ ] Monitor leader slot utilization with BAM
+- [ ] Document BAM connection issues in logs
 
-### 11.3 BAM Troubleshooting
-- [ ] Document common BAM connection issues
-- [ ] Create debug script for BAM problems
-- [ ] Add BAM-specific logging
-- [ ] Monitor for validator consensus with BAM blocks
-
----
-
-## Assessment: BAM Integration Feasibility
-
-### Is BAM Available on Testnet?
-
-**✅ YES** - BAM is currently live on testnet with an initial validator cluster.
-
-**Status:**
-- Currently in limited testnet with initial validators
-- Public testnet access coming soon
-- Requires being in leader schedule to participate
-- Mainnet deployment planned after testnet validation
-
-### Are the Instructions Sufficient?
-
-**⚠️ PARTIALLY SUFFICIENT** - The available documentation provides the core configuration requirements but lacks some details:
-
-**What We Know:**
-- ✅ Required flags: `--bam-url` and `--enable-rpc-transaction-history`
-- ✅ Testnet BAM URL: `http://ny.testnet.bam.jito.wtf`
-- ✅ Metrics configuration format
-- ✅ Prerequisite: Must be in leader schedule
-
-**What's Missing/Unclear:**
-- ❓ Detailed bam-client repository documentation (requires direct GitHub access)
-- ❓ Minimum stake requirements for consistent leader slots
-- ❓ Storage requirements for RPC transaction history on testnet
-- ❓ Process for joining public testnet when it opens
-- ❓ Expected behavior/logs when BAM is properly connected
-- ❓ Troubleshooting guide for BAM connection issues
-
-### Recommendations
-
-1. **For Immediate Testing:**
-   - Follow the configuration steps in Phase 10
-   - Add the two required flags to validator launch
-   - Monitor logs for BAM connection attempts
-   - Verify validator is getting leader slots
-
-2. **For Production Readiness:**
-   - Wait for public testnet announcement
-   - Review official bam-client documentation when accessible
-   - Test with sufficient stake for regular leader slots
-   - Implement comprehensive monitoring before enabling on mainnet
-
-3. **Additional Research Needed:**
-   - Access https://github.com/jito-labs/bam-client for detailed docs
-   - Join Jito Discord/community for BAM testnet updates
-   - Monitor https://bam.dev/validators/ for updated documentation
-   - Review Jito-Solana changelog for BAM-related updates
-
----
-
-## Next Steps
-
-1. Complete Phases 4-8 to get a fully operational Jito-Solana validator
-2. Ensure validator receives regular leader slots (sufficient stake)
-3. Monitor for public BAM testnet announcement
-4. Implement BAM configuration (Phase 10) when testnet access is available
-5. Validate BAM integration on testnet before considering mainnet
+### 11.4 Documentation
+- [ ] Update README.md with BAM enable/disable instructions
+- [ ] Document BAM troubleshooting steps
+- [ ] Add BAM-specific health checks to troubleshooting guide
 
 ---
 
@@ -573,6 +438,5 @@ fi
 
 - **BAM Documentation**: https://bam.dev/validators/
 - **BAM Client Repository**: https://github.com/jito-labs/bam-client
-- **Jito-Solana Docs**: https://jito-foundation.gitbook.io/mev/
 - **Jito-Solana Repository**: https://github.com/jito-foundation/jito-solana
 - **Jito Official Docs**: https://docs.jito.wtf/
