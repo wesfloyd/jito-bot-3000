@@ -233,20 +233,36 @@ resource "aws_instance" "jito_validator" {
 - [x] Clone Jito-Solana repository (done via build script)
 - [x] Initialize Git submodules (anchor, jito-programs, jito-protos)
 - [x] Update build script to use `agave-validator` binary name (v2.x change)
-- [ ] Build validator binary (IN PROGRESS - currently compiling)
-- [ ] Install validator binary (pending build completion)
-- [ ] Verify installation (pending build completion)
+- [x] Build validator binary (agave-validator 2.3.13, build time: 6m35s)
+- [x] Install validator binary (installed to ~/.local/bin/)
+- [x] Verify installation (verified: JitoLabs client, commit 4d83054f93)
 
 ---
 
 ## Phase 6: Validator Configuration (Bash)
 
-### 6.1 Configuration Generation
-- [ ] Create `scripts/validator/configure.sh` for configuration generation
-- [ ] Generate validator.sh script from template
-- [ ] Configure RPC endpoints
-- [ ] Set up logging configuration
-- [ ] Configure performance settings
+### 6.1 Keypair Upload
+- [x] Create `scripts/validator/upload-keys.sh` for keypair upload
+- [x] Upload validator identity keypair (2wZd77kQgoHPPoCgJmgPDa5q1TFVzSJnhjMcnxgFfepg)
+- [x] Upload vote account keypair (6Vmd8LLb61dgdjwipfvhmEYo2jF3FNqWzGyQPCMciGtj)
+- [x] Set secure permissions (600) on remote keypairs
+- [x] Verify keypairs on remote instance
+
+### 6.2 Configuration Generation
+- [x] Create `scripts/validator/configure.sh` for configuration generation
+- [x] Generate validator startup script (~/validator/start-validator.sh)
+- [x] Configure Jito endpoints (block-engine, relayer, shred-receiver)
+- [x] Configure RPC endpoints (testnet)
+- [x] Set up logging configuration
+- [x] Configure performance settings
+- [x] Create systemd service (jito-validator.service)
+
+### 6.3 Vote Account Creation
+- [x] Create `scripts/validator/create-vote-account.sh` for vote account setup
+- [x] Cleanup existing regular account at vote keypair address
+- [x] Create vote account on-chain (commission: 10%)
+- [x] Link validator identity to vote account
+- [x] Verify vote account creation (balance: 0.0270744 SOL)
 
 ---
 
