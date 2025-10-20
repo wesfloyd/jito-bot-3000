@@ -85,6 +85,11 @@ log_section() {
     echo ""
 }
 
+log_subsection() {
+    local message=$1
+    echo "${BOLD}${CYAN}$message${RESET}" | tee -a "$LOG_FILE"
+}
+
 # ============================================================================
 # Dependency Checking
 # ============================================================================
