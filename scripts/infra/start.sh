@@ -83,6 +83,19 @@ main() {
                 aws ec2 wait instance-running --region "$aws_region" --instance-ids "$instance_id"
                 log_success "Instance started successfully"
                 
+                # Refresh Terraform state so outputs reflect the new AWS state
+                log_info "Refreshing Terraform state to sync instance status..."
+                local terraform_dir
+                terraform_dir=$(get_terraform_dir)
+                (
+                    cd "$terraform_dir" || exit 1
+                    if terraform apply -refresh-only -auto-approve >/dev/null 2>&1; then
+                        log_success "Terraform state refreshed"
+                    else
+                        log_warn "Terraform refresh failed; state may lag until next plan/apply"
+                    fi
+                )
+                
                 # Get updated instance information
                 show_running_status
             else

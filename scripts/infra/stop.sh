@@ -83,6 +83,20 @@ main() {
                 log_info "Waiting for instance to stop..."
                 aws ec2 wait instance-stopped --region "$aws_region" --instance-ids "$instance_id"
                 log_success "Instance stopped successfully"
+
+                # Refresh Terraform state so outputs reflect the new AWS state
+                log_info "Refreshing Terraform state to sync instance status..."
+                local terraform_dir
+                terraform_dir=$(get_terraform_dir)
+                (
+                    cd "$terraform_dir" || exit 1
+                    # Use refresh-only to update state without changing resources
+                    if terraform apply -refresh-only -auto-approve >/dev/null 2>&1; then
+                        log_success "Terraform state refreshed"
+                    else
+                        log_warn "Terraform refresh failed; state may lag until next plan/apply"
+                    fi
+                )
             else
                 log_error "Failed to stop instance"
                 exit 1
