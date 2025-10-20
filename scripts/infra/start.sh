@@ -23,7 +23,7 @@ main() {
     # Check if Terraform state exists
     if ! terraform_status >/dev/null 2>&1; then
         log_warn "No Terraform state found"
-        log_info "Use ./scripts/03-terraform-apply.sh to create infrastructure"
+        log_info "Use ./scripts/infra/deploy.sh to create infrastructure"
         exit 0
     fi
 
@@ -33,16 +33,13 @@ main() {
 
     if [[ -z "$instance_id" ]]; then
         log_warn "No instance found in Terraform state"
-        log_info "Use ./scripts/03-terraform-apply.sh to create infrastructure"
+        log_info "Use ./scripts/infra/deploy.sh to create infrastructure"
         exit 0
     fi
 
-    # Check current instance state
+    # Check current instance state from Terraform
     local current_state
-    current_state=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].State.Name' \
-        --output text 2>/dev/null || echo "unknown")
+    current_state=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
 
     log_info "Instance ID: $instance_id"
     log_info "Current state: $current_state"
@@ -75,13 +72,15 @@ main() {
 
             # Start the instance
             log_info "Starting instance: $instance_id"
-            if aws ec2 start-instances --instance-ids "$instance_id" >/dev/null; then
+            local aws_region
+            aws_region=$(get_terraform_output "region" 2>/dev/null || echo "us-west-1")
+            if aws ec2 start-instances --region "$aws_region" --instance-ids "$instance_id" >/dev/null; then
                 log_success "Instance start initiated successfully"
                 log_info "Instance will start in a few moments"
                 
                 # Wait for instance to start
                 log_info "Waiting for instance to start..."
-                aws ec2 wait instance-running --instance-ids "$instance_id"
+                aws ec2 wait instance-running --region "$aws_region" --instance-ids "$instance_id"
                 log_success "Instance started successfully"
                 
                 # Get updated instance information
@@ -93,7 +92,7 @@ main() {
             ;;
         "terminated")
             log_error "Instance is terminated and cannot be started"
-            log_info "Use ./scripts/03-terraform-apply.sh to recreate infrastructure"
+            log_info "Use ./scripts/infra/deploy.sh to recreate infrastructure"
             exit 1
             ;;
         *)
@@ -111,7 +110,7 @@ show_start_cost_info() {
     log_info "Cost Information:"
     log_info "  Starting instance will resume compute costs (~$0.81/hour)"
     log_info "  Auto-stop is configured for 8 hours"
-    log_info "  Use ./scripts/12-terraform-stop.sh to stop and save costs"
+    log_info "  Use ./scripts/infra/stop.sh to stop and save costs"
 }
 
 show_running_status() {
@@ -124,15 +123,8 @@ show_running_status() {
         local private_ip
         local ssh_command
         
-        public_ip=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text 2>/dev/null || echo "unknown")
-            
-        private_ip=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].PrivateIpAddress' \
-            --output text 2>/dev/null || echo "unknown")
+        public_ip=$(get_terraform_output "public_ip" 2>/dev/null || echo "unknown")
+        private_ip=$(get_terraform_output "private_ip" 2>/dev/null || echo "unknown")
 
         log_section "Instance Status"
         log_info "Instance ID: $instance_id"
@@ -147,10 +139,10 @@ show_running_status() {
             log_info "  ssh -i keys/jito-validator-key.pem ubuntu@$public_ip"
             log_info ""
             log_info "To stop the instance:"
-            log_info "  ./scripts/12-terraform-stop.sh"
+            log_info "  ./scripts/infra/stop.sh"
             log_info ""
             log_info "To completely destroy infrastructure:"
-            log_info "  ./scripts/11-terraform-destroy.sh"
+            log_info "  ./scripts/infra/destroy.sh"
         fi
     fi
 }

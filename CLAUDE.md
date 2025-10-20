@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository aims to maximally automate the deployment of Jito-Solana validators on testnet using AI-driven automation. The goal is to minimize manual user interactions by creating scripts that handle provisioning, configuration, and deployment of Jito validators.
 
+## Overarching Guidance
+- Be concise where possible on recommendations.
+
 ## Key Documentation
 
 - `jito-solana-validator-testnet-chatgpt.md`: Complete step-by-step manual guide for deploying a Jito validator on testnet, including cloud provisioning, key generation, Jito-Solana compilation, and validator configuration

@@ -70,12 +70,9 @@ show_infrastructure_status() {
         echo "  ${BOLD}Availability Zone:${RESET} $availability_zone"
         echo ""
 
-        # Get current instance state
+        # Get current instance state from Terraform
         local instance_state
-        instance_state=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].State.Name' \
-            --output text 2>/dev/null || echo "unknown")
+        instance_state=$(terraform output -raw instance_state 2>/dev/null || echo "unknown")
 
         echo "  ${BOLD}Current State:${RESET} $instance_state"
         echo ""
@@ -108,21 +105,24 @@ show_cost_information() {
     instance_id=$(terraform output -raw instance_id 2>/dev/null || echo "")
 
     if [[ -n "$instance_id" ]]; then
-        # Get instance launch time
-        local launch_time
-        launch_time=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].LaunchTime' \
-            --output text 2>/dev/null || echo "")
+        # Get instance deployment time from Terraform
+        local deployment_time
+        deployment_time=$(terraform output -raw deployment_timestamp 2>/dev/null || echo "")
 
-        if [[ -n "$launch_time" ]]; then
+        if [[ -n "$deployment_time" ]]; then
             # Calculate uptime
-            local launch_epoch
-            launch_epoch=$(date -d "$launch_time" +%s)
+            local deployment_epoch
+            # Parse UTC timestamp correctly
+            deployment_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$deployment_time" +%s 2>/dev/null || date +%s)
             local current_epoch
             current_epoch=$(date +%s)
-            local uptime_seconds=$((current_epoch - launch_epoch))
+            local uptime_seconds=$((current_epoch - deployment_epoch))
+            # Handle case where deployment is in the future (shouldn't happen but be safe)
+            if [[ $uptime_seconds -lt 0 ]]; then
+                uptime_seconds=0
+            fi
             local uptime_hours=$((uptime_seconds / 3600))
+            local uptime_minutes=$(((uptime_seconds % 3600) / 60))
 
             echo "${BOLD}Uptime:${RESET} ${uptime_hours}h ${uptime_minutes}m"
             echo ""
@@ -184,6 +184,11 @@ show_connection_information() {
     ssh_command=$(terraform output -raw ssh_command 2>/dev/null || echo "")
     local ssh_key_file
     ssh_key_file=$(terraform output -raw ssh_key_file 2>/dev/null || echo "")
+
+    # Convert relative path to absolute path
+    if [[ -n "$ssh_key_file" && "$ssh_key_file" == ../* ]]; then
+        ssh_key_file=$(realpath "$ssh_key_file")
+    fi
 
     if [[ -n "$ssh_command" ]]; then
         echo "${BOLD}SSH Connection:${RESET}"

@@ -90,20 +90,17 @@ show_cost_information() {
     instance_id=$(terraform output -raw instance_id 2>/dev/null || echo "")
 
     if [[ -n "$instance_id" ]]; then
-        # Get instance launch time
-        local launch_time
-        launch_time=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].LaunchTime' \
-            --output text 2>/dev/null || echo "")
+        # Get instance deployment time from Terraform
+        local deployment_time
+        deployment_time=$(get_terraform_output "deployment_timestamp" 2>/dev/null || echo "")
 
-        if [[ -n "$launch_time" ]]; then
+        if [[ -n "$deployment_time" ]]; then
             # Calculate uptime
-            local launch_epoch
-            launch_epoch=$(date -d "$launch_time" +%s)
+            local deployment_epoch
+            deployment_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$deployment_time" +%s 2>/dev/null || date +%s)
             local current_epoch
             current_epoch=$(date +%s)
-            local uptime_seconds=$((current_epoch - launch_epoch))
+            local uptime_seconds=$((current_epoch - deployment_epoch))
             local uptime_hours=$((uptime_seconds / 3600))
 
             log_info "Instance uptime: ${uptime_hours} hours"

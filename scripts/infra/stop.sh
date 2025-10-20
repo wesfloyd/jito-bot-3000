@@ -37,12 +37,9 @@ main() {
         exit 0
     fi
 
-    # Check current instance state
+    # Check current instance state from Terraform
     local current_state
-    current_state=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].State.Name' \
-        --output text 2>/dev/null || echo "unknown")
+    current_state=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
 
     log_info "Instance ID: $instance_id"
     log_info "Current state: $current_state"
@@ -64,9 +61,6 @@ main() {
             exit 0
             ;;
         "running")
-            # Show cost information before stopping
-            show_stop_cost_savings
-            
             # Confirm before stopping
             if [[ "${AUTO_CONFIRM:-}" != "true" ]]; then
                 if ! prompt_confirmation "Stop the instance to save compute costs?"; then
@@ -79,13 +73,15 @@ main() {
 
             # Stop the instance
             log_info "Stopping instance: $instance_id"
-            if aws ec2 stop-instances --instance-ids "$instance_id" >/dev/null; then
+            local aws_region
+            aws_region=$(get_terraform_output "region" 2>/dev/null || echo "us-west-1")
+            if aws ec2 stop-instances --region "$aws_region" --instance-ids "$instance_id" >/dev/null; then
                 log_success "Instance stop initiated successfully"
                 log_info "Instance will stop in a few moments"
                 
                 # Wait for instance to stop
                 log_info "Waiting for instance to stop..."
-                aws ec2 wait instance-stopped --instance-ids "$instance_id"
+                aws ec2 wait instance-stopped --region "$aws_region" --instance-ids "$instance_id"
                 log_success "Instance stopped successfully"
             else
                 log_error "Failed to stop instance"
@@ -106,13 +102,6 @@ main() {
 # Helper Functions
 # ============================================================================
 
-show_stop_cost_savings() {
-    log_info "Cost Savings Information:"
-    log_info "  Instance will stop - compute costs will stop immediately"
-    log_info "  Storage costs will continue (~$163.84/month for 2TB)"
-    log_info "  Use ./scripts/13-terraform-start.sh to restart"
-    log_info "  Use ./scripts/11-terraform-destroy.sh to completely remove"
-}
 
 show_stop_status() {
     local instance_id
@@ -120,10 +109,7 @@ show_stop_status() {
 
     if [[ -n "$instance_id" ]]; then
         local current_state
-        current_state=$(aws ec2 describe-instances \
-            --instance-ids "$instance_id" \
-            --query 'Reservations[0].Instances[0].State.Name' \
-            --output text 2>/dev/null || echo "unknown")
+        current_state=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
 
         log_section "Instance Status"
         log_info "Instance ID: $instance_id"
@@ -133,10 +119,10 @@ show_stop_status() {
             log_success "Instance is stopped and not incurring compute costs"
             log_info ""
             log_info "To restart the instance:"
-            log_info "  ./scripts/13-terraform-start.sh"
+            log_info "  ./scripts/infra/start.sh"
             log_info ""
             log_info "To completely destroy infrastructure:"
-            log_info "  ./scripts/11-terraform-destroy.sh"
+            log_info "  ./scripts/infra/destroy.sh"
         fi
     fi
 }

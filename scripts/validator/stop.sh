@@ -23,7 +23,7 @@ main() {
     # Check if Terraform state exists
     if ! terraform_status >/dev/null 2>&1; then
         log_error "No Terraform state found"
-        log_info "Have you run ./scripts/03-terraform-apply.sh yet?"
+        log_info "Have you run ./scripts/infra/deploy.sh yet?"
         exit 1
     fi
 
@@ -41,12 +41,9 @@ main() {
     log_info "Instance ID: $instance_id"
     log_info "Region: $region"
 
-    # Check current status
+    # Check current status from Terraform
     local current_status
-    current_status=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].State.Name' \
-        --output text 2>/dev/null || echo "unknown")
+    current_status=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
     log_info "Current status: $current_status"
 
     if [[ "$current_status" == "stopped" ]]; then
@@ -75,7 +72,7 @@ main() {
 
     # Stop instance
     log_info "Stopping instance: $instance_id"
-    if ! aws ec2 stop-instances --instance-ids "$instance_id" >/dev/null; then
+    if ! aws ec2 stop-instances --region "$region" --instance-ids "$instance_id" >/dev/null; then
         log_error "Failed to stop instance"
         exit 1
     fi

@@ -50,7 +50,7 @@ _log() {
     local color=$2
     shift 2
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "${color}[${timestamp}] [${level}]${RESET} $*" | tee -a "$LOG_FILE"
+    echo "${color}[${timestamp}] [${level}]${RESET} ${*:-}" | tee -a "$LOG_FILE"
 }
 
 log_debug() {

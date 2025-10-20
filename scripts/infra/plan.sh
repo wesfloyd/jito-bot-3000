@@ -50,8 +50,8 @@ main() {
     log_info ""
     log_info "Next steps:"
     log_info "  1. Review the plan above"
-    log_info "  2. Run: ./scripts/03-terraform-apply.sh"
-    log_info "  3. Or run: ./scripts/11-terraform-destroy.sh (to cleanup)"
+    log_info "  2. Run: ./scripts/infra/deploy.sh"
+    log_info "  3. Or run: ./scripts/infra/destroy.sh (to cleanup)"
     log_info ""
 }
 

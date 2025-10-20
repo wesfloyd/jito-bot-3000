@@ -23,7 +23,7 @@ main() {
     # Check if Terraform state exists
     if ! terraform_status >/dev/null 2>&1; then
         log_error "No Terraform state found"
-        log_info "Have you run ./scripts/03-terraform-apply.sh yet?"
+        log_info "Have you run ./scripts/infra/deploy.sh yet?"
         exit 1
     fi
 
@@ -41,12 +41,9 @@ main() {
     log_info "Instance ID: $instance_id"
     log_info "Region: $region"
 
-    # Check current status
+    # Check current status from Terraform
     local current_status
-    current_status=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].State.Name' \
-        --output text 2>/dev/null || echo "unknown")
+    current_status=$(get_terraform_output "instance_state" 2>/dev/null || echo "unknown")
     log_info "Current status: $current_status"
 
     if [[ "$current_status" == "running" ]]; then
@@ -63,7 +60,7 @@ main() {
 
     if [[ "$current_status" == "terminated" ]]; then
         log_error "Instance has been terminated"
-        log_info "You need to provision a new instance with ./scripts/03-terraform-apply.sh"
+        log_info "You need to provision a new instance with ./scripts/infra/deploy.sh"
         exit 1
     fi
 
@@ -78,7 +75,7 @@ main() {
 
     # Start instance
     log_info "Starting instance: $instance_id"
-    if ! aws ec2 start-instances --instance-ids "$instance_id" >/dev/null; then
+    if ! aws ec2 start-instances --region "$region" --instance-ids "$instance_id" >/dev/null; then
         log_error "Failed to start instance"
         exit 1
     fi
@@ -104,18 +101,15 @@ wait_for_instance_and_ssh() {
 
     # Wait for running
     log_info "Waiting for instance to be running..."
-    if ! aws ec2 wait instance-running --instance-ids "$instance_id"; then
+    if ! aws ec2 wait instance-running --region "$region" --instance-ids "$instance_id"; then
         log_error "Instance failed to start"
         exit 1
     fi
 
-    # Get new IP (may have changed)
+    # Get new IP from Terraform (may have changed)
     log_info "Retrieving new public IP..."
     local public_ip
-    public_ip=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].PublicIpAddress' \
-        --output text 2>/dev/null || echo "")
+    public_ip=$(get_terraform_output "public_ip" 2>/dev/null || echo "")
 
     if [[ -z "$public_ip" || "$public_ip" == "None" ]]; then
         log_error "Failed to get instance public IP"
@@ -186,10 +180,7 @@ show_connection_info() {
     local instance_id
     instance_id=$(get_terraform_output "instance_id" 2>/dev/null || echo "")
     local public_ip
-    public_ip=$(aws ec2 describe-instances \
-        --instance-ids "$instance_id" \
-        --query 'Reservations[0].Instances[0].PublicIpAddress' \
-        --output text 2>/dev/null || echo "unknown")
+    public_ip=$(get_terraform_output "public_ip" 2>/dev/null || echo "unknown")
     local ssh_key_file
     ssh_key_file=$(get_terraform_output "ssh_key_file" 2>/dev/null || echo "../keys/jito-validator-key.pem")
     local ssh_user="ubuntu"
