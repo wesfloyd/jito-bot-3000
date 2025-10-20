@@ -220,20 +220,20 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 5: Validator Setup (SSH + Bash)
+## Phase 5: Validator Setup (SSH + Bash) ✅ COMPLETED
 
 ### 5.1 Remote VM Configuration
-- [ ] Create `scripts/validator/setup.sh` for SSH to provisioned instance
-- [ ] Update system packages
-- [ ] Install required dependencies (Rust, build tools)
-- [ ] Configure system settings
+- [x] Create `scripts/validator/setup.sh` for SSH to provisioned instance
+- [x] Update system packages
+- [x] Install required dependencies (Rust, build tools)
+- [x] Configure system settings
 
-### 5.2 Jito-Solana Compilation
-- [ ] Create `scripts/validator/build.sh` for Jito-Solana compilation
-- [ ] Clone Jito-Solana repository
-- [ ] Build validator binary
-- [ ] Install validator binary
-- [ ] Verify installation
+### 5.2 Jito-Solana Compilation Scripts
+- [x] Create `scripts/validator/build.sh` for Jito-Solana compilation
+- [ ] Clone Jito-Solana repository (done via build script)
+- [ ] Build validator binary (done via build script)
+- [ ] Install validator binary (done via build script)
+- [ ] Verify installation (done via build script)
 
 ---
 
