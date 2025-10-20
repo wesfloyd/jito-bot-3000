@@ -274,6 +274,14 @@ resource "aws_instance" "jito_validator" {
 - [ ] Update validator
 - [ ] Cleanup resources
 
+### 8.3 Documentation
+- [ ] Update README.md with minimal getting started guide
+  - [ ] Prerequisites (AWS CLI, Terraform, Solana CLI)
+  - [ ] Step-by-step script execution order
+  - [ ] Manual steps required (funding accounts, etc.)
+  - [ ] Expected outputs at each phase
+  - [ ] Troubleshooting common issues
+
 ---
 
 ## Phase 9: BAM Integration (Block Assembly Marketplace)
