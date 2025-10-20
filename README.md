@@ -1,6 +1,9 @@
 # jito-bot-3000
 Terraform-based automation to launch Jito Solana validator on testnet
 
+<img src="public/jito-bot-logo-ascii.png" alt="Jito Bot Logo" width="250px">
+
+
 ## Purpose
 This repo provides a complete automation solution for standing up a Jito Solana validator client on testnet using Terraform for infrastructure management.
 

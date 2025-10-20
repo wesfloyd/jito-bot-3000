@@ -246,10 +246,10 @@ exec agave-validator \
     --rpc-bind-address 0.0.0.0 \
     --only-known-rpc \
     --full-rpc-api \
-    --no-voting \
-    --enable-rpc-transaction-history \
-    --enable-extended-tx-metadata-storage \
-    --rpc-pubsub-enable-block-subscription
+    --tip-payment-program-pubkey GJHtFqM9agxPmkeKjHny6qiRKrXZALvvFGiKf11QE7hy \
+    --tip-distribution-program-pubkey F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 \
+    --merkle-root-upload-authority GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib \
+    --commission-bps 800
 EOF_VALIDATOR_SCRIPT
 }
 

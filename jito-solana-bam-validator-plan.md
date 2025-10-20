@@ -357,28 +357,31 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 9: BAM Configuration
+## Phase 9: BAM Configuration ⏳ IN PROGRESS
 
 ### 9.1 Prerequisites Check
-- [ ] Verify validator is fully operational on testnet
-- [ ] Confirm validator has stake and receives leader slots
-- [ ] Check available disk space (RPC tx history requires additional storage)
+- [x] Check available disk space (RPC tx history requires additional storage)
+  - ✅ 2TB total, 11GB used (1%) - **plenty of space for RPC history**
+  - Validator directories still initializing (catchup in progress)
+- [ ] Verify validator is fully operational on testnet (BLOCKED: validator catching up)
+- [ ] Confirm validator has stake and receives leader slots (BLOCKED: testnet, 0 stake)
 
 ### 9.2 Configuration File
-- [ ] Create `config/bam-config.env`:
-```bash
-BAM_URL="http://ny.testnet.bam.jito.wtf"
-BAM_METRICS_HOST="http://bam-public-metrics.jito.wtf:8086"
-BAM_METRICS_DB="testnet-bam-validators"
-BAM_METRICS_USER="testnet-bam-validator"
-BAM_METRICS_PASSWORD="wambamdamn"
-```
+- [x] Create `config/bam-config.env` with BAM endpoints and credentials
+  - BAM URL: `http://ny.testnet.bam.jito.wtf`
+  - Metrics: `http://bam-public-metrics.jito.wtf:8086`
+  - Database: `testnet-bam-validators`
+  - Default: `ENABLE_BAM="false"` (toggle to enable)
 
 ### 9.3 Validator Configuration Script
-- [ ] Create `scripts/validator/configure-bam.sh`
-- [ ] Check validator is in leader schedule before enabling
-- [ ] Validate storage capacity for RPC transaction history
-- [ ] Update Terraform `root_block_device` size if needed
+- [x] Create `scripts/validator/configure-bam.sh`
+  - Automated prerequisite checks (validator running, catchup status, disk space)
+  - Leader schedule verification (warning only on testnet)
+  - BAM flag injection into startup script
+  - Enable/disable toggle: `--enable` / `--disable` flags
+  - Force mode: `--force` to bypass catchup checks
+  - Automatic backup of existing configuration
+- [ ] Execute script to enable BAM (BLOCKED: waiting for validator catchup)
 
 ---
 
