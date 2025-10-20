@@ -93,8 +93,9 @@ create_security_group() {
     local sg_name=$1
     local description=$2
     local region=${3:-$AWS_REGION}
+    local vpc_id=${4:-${AWS_VPC_ID:-}}
 
-    log_info "Checking for security group: $sg_name"
+    log_info "Checking for security group: $sg_name" >&2
 
     # Check if security group already exists
     local sg_id
@@ -105,22 +106,32 @@ create_security_group() {
         --output text 2>/dev/null)
 
     if [[ -n "$sg_id" && "$sg_id" != "None" ]]; then
-        log_info "Security group already exists: $sg_id"
+        log_info "Security group already exists: $sg_id" >&2
         echo "$sg_id"
         return 0
     fi
 
     # Create security group
-    log_info "Creating security group: $sg_name"
+    log_info "Creating security group: $sg_name" >&2
 
-    sg_id=$(aws ec2 create-security-group \
-        --group-name "$sg_name" \
-        --description "$description" \
-        --region "$region" \
-        --query 'GroupId' \
-        --output text)
+    if [[ -n "$vpc_id" ]]; then
+        sg_id=$(aws ec2 create-security-group \
+            --group-name "$sg_name" \
+            --description "$description" \
+            --vpc-id "$vpc_id" \
+            --region "$region" \
+            --query 'GroupId' \
+            --output text)
+    else
+        sg_id=$(aws ec2 create-security-group \
+            --group-name "$sg_name" \
+            --description "$description" \
+            --region "$region" \
+            --query 'GroupId' \
+            --output text)
+    fi
 
-    log_success "Created security group: $sg_id"
+    log_success "Created security group: $sg_id" >&2
 
     echo "$sg_id"
     return 0
@@ -185,7 +196,7 @@ configure_validator_security_group() {
 find_latest_ubuntu_ami() {
     local region=${1:-$AWS_REGION}
 
-    log_info "Finding latest Ubuntu 22.04 AMI in $region..."
+    log_info "Finding latest Ubuntu 22.04 AMI in $region..." >&2
 
     local ami_id
     ami_id=$(aws ec2 describe-images \
@@ -198,11 +209,11 @@ find_latest_ubuntu_ami() {
         --output text)
 
     if [[ -z "$ami_id" || "$ami_id" == "None" ]]; then
-        log_error "Could not find Ubuntu 22.04 AMI"
+        log_error "Could not find Ubuntu 22.04 AMI" >&2
         return 1
     fi
 
-    log_success "Found AMI: $ami_id"
+    log_success "Found AMI: $ami_id" >&2
     echo "$ami_id"
 
     return 0
@@ -220,39 +231,105 @@ launch_ec2_instance() {
     local instance_name=$5
     local volume_size=$6
     local region=${7:-$AWS_REGION}
+    local vpc_id=${8:-${AWS_VPC_ID:-}}
 
-    log_info "Launching EC2 instance..."
-    log_info "  Type: $instance_type"
-    log_info "  AMI: $ami_id"
-    log_info "  Storage: ${volume_size}GB"
+    log_info "Launching EC2 instance..." >&2
+    log_info "  Type: $instance_type" >&2
+    log_info "  AMI: $ami_id" >&2
+    log_info "  Storage: ${volume_size}GB" >&2
+
+    # Get subnet ID for the VPC in a supported AZ
+    local subnet_id
+    if [[ -n "$vpc_id" ]]; then
+        # Get supported availability zones for this instance type
+        local supported_azs
+        supported_azs=$(aws ec2 describe-instance-type-offerings \
+            --location-type availability-zone \
+            --filters "Name=instance-type,Values=$instance_type" \
+            --region "$region" \
+            --query 'InstanceTypeOfferings[*].Location' \
+            --output text)
+        
+        log_info "Supported AZs for $instance_type: $supported_azs" >&2
+        
+        # Find a subnet in a supported AZ
+        subnet_id=$(aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=$vpc_id" \
+            --region "$region" \
+            --query "Subnets[?AvailabilityZone==\`$(echo $supported_azs | awk '{print $1}')\`].SubnetId" \
+            --output text)
+        
+        # If first AZ doesn't work, try others
+        if [[ -z "$subnet_id" || "$subnet_id" == "None" ]]; then
+            for az in $supported_azs; do
+                subnet_id=$(aws ec2 describe-subnets \
+                    --filters "Name=vpc-id,Values=$vpc_id" \
+                    --region "$region" \
+                    --query "Subnets[?AvailabilityZone==\`$az\`].SubnetId" \
+                    --output text)
+                if [[ -n "$subnet_id" && "$subnet_id" != "None" ]]; then
+                    break
+                fi
+            done
+        fi
+        
+        if [[ -z "$subnet_id" || "$subnet_id" == "None" ]]; then
+            log_error "No subnet found in VPC $vpc_id for supported AZs: $supported_azs" >&2
+            return 1
+        fi
+        log_info "  Subnet: $subnet_id" >&2
+    fi
 
     local instance_id
-    instance_id=$(aws ec2 run-instances \
-        --image-id "$ami_id" \
-        --instance-type "$instance_type" \
-        --key-name "$key_name" \
-        --security-group-ids "$sg_id" \
-        --block-device-mappings "[{
-            \"DeviceName\": \"/dev/sda1\",
-            \"Ebs\": {
-                \"VolumeSize\": $volume_size,
-                \"VolumeType\": \"gp3\",
-                \"Iops\": 16000,
-                \"Throughput\": 1000,
-                \"DeleteOnTermination\": true
-            }
-        }]" \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance_name}]" \
-        --region "$region" \
-        --query 'Instances[0].InstanceId' \
-        --output text)
+    if [[ -n "$subnet_id" ]]; then
+        instance_id=$(aws ec2 run-instances \
+            --image-id "$ami_id" \
+            --instance-type "$instance_type" \
+            --key-name "$key_name" \
+            --security-group-ids "$sg_id" \
+            --subnet-id "$subnet_id" \
+            --block-device-mappings "[{
+                \"DeviceName\": \"/dev/sda1\",
+                \"Ebs\": {
+                    \"VolumeSize\": $volume_size,
+                    \"VolumeType\": \"gp3\",
+                    \"Iops\": 16000,
+                    \"Throughput\": 1000,
+                    \"DeleteOnTermination\": true
+                }
+            }]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance_name}]" \
+            --region "$region" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+    else
+        instance_id=$(aws ec2 run-instances \
+            --image-id "$ami_id" \
+            --instance-type "$instance_type" \
+            --key-name "$key_name" \
+            --security-group-ids "$sg_id" \
+            --block-device-mappings "[{
+                \"DeviceName\": \"/dev/sda1\",
+                \"Ebs\": {
+                    \"VolumeSize\": $volume_size,
+                    \"VolumeType\": \"gp3\",
+                    \"Iops\": 16000,
+                    \"Throughput\": 1000,
+                    \"DeleteOnTermination\": true
+                }
+            }]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance_name}]" \
+            --region "$region" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+    fi
 
     if [[ -z "$instance_id" ]]; then
         log_error "Failed to launch instance"
         return 1
     fi
 
-    log_success "Instance launched: $instance_id"
+    log_success "Instance launched: $instance_id" >&2
     echo "$instance_id"
 
     return 0
@@ -473,7 +550,6 @@ estimate_instance_cost() {
     local total_cost
     total_cost=$(calculate_cost "$hours" "$hourly_rate")
 
-    log_info "Estimated cost: \$${total_cost} (${hours}h @ \$${hourly_rate}/hour)"
     echo "$total_cost"
 
     return 0

@@ -182,7 +182,8 @@ provision_security_group() {
     sg_id=$(create_security_group \
         "$AWS_SECURITY_GROUP_NAME" \
         "Security group for Jito validator" \
-        "$AWS_REGION")
+        "$AWS_REGION" \
+        "${AWS_VPC_ID:-}")
 
     if [[ -z "$sg_id" ]]; then
         log_error "Failed to create security group"
@@ -246,7 +247,8 @@ provision_ec2_instance() {
         "$sg_id" \
         "$AWS_INSTANCE_NAME" \
         "$AWS_VOLUME_SIZE" \
-        "$AWS_REGION")
+        "$AWS_REGION" \
+        "${AWS_VPC_ID:-}")
 
     if [[ -z "$instance_id" ]]; then
         log_error "Failed to launch EC2 instance"
