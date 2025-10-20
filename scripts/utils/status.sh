@@ -202,12 +202,10 @@ get_validator_process_info() {
     fi
 
     # Get all process info in a single SSH call for efficiency
+    # Note: Don't redirect stderr inside the command since ssh_exec already does it
     local process_info
     process_info=$(ssh_exec "$ssh_host" "$ssh_key" \
-        "pid=\$(pgrep agave-validator 2>/dev/null | head -1); \
-         if [ -n \"\$pid\" ]; then \
-             ps -p \$pid -o pid=,etime=,%cpu=,%mem= 2>/dev/null | tr -s ' ' | sed 's/^ //'; \
-         fi" || echo "")
+        "pid=\$(pgrep agave-validator | head -1) && ps -p \$pid -o pid=,etime=,%cpu=,%mem= | tail -1 | tr -s ' ' | sed 's/^ //'" || echo "")
 
     if [[ -z "$process_info" ]]; then
         echo "running|unknown|||"
