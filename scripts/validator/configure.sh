@@ -205,11 +205,18 @@ EXPECTED_SHRED_VERSION="0"
 # Create log directory
 mkdir -p "$LOG_DIR"
 
-# Log file with timestamp
-LOG_FILE="$LOG_DIR/validator-$(date +%Y%m%d-%H%M%S).log"
+# Log files with timestamp
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+LOG_FILE="$LOG_DIR/validator-$TIMESTAMP.log"
+ERROR_LOG="$LOG_DIR/validator-$TIMESTAMP.err"
 
 echo "Starting Jito-Solana Validator..."
 echo "Log file: $LOG_FILE"
+echo "Error log: $ERROR_LOG"
+
+# Enable Rust backtrace for better error messages
+export RUST_BACKTRACE=1
+export RUST_LOG=info
 
 # Known validators for testnet (trusted validators to bootstrap from)
 KNOWN_VALIDATORS=(
@@ -246,10 +253,12 @@ exec agave-validator \
     --rpc-bind-address 0.0.0.0 \
     --only-known-rpc \
     --full-rpc-api \
-    --no-voting \
-    --enable-rpc-transaction-history \
-    --enable-extended-tx-metadata-storage \
-    --rpc-pubsub-enable-block-subscription
+    --tip-payment-program-pubkey GJHtFqM9agxPmkeKjHny6qiRKrXZALvvFGiKf11QE7hy \
+    --tip-distribution-program-pubkey F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 \
+    --merkle-root-upload-authority GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib \
+    --commission-bps 800 \
+    2>> "$ERROR_LOG"
+
 EOF_VALIDATOR_SCRIPT
 }
 

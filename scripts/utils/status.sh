@@ -201,22 +201,22 @@ get_validator_process_info() {
         return 0
     fi
 
-    local pid
-    pid=$(ssh_exec "$ssh_host" "$ssh_key" "pgrep -f agave-validator" || echo "unknown")
+    # Get all process info in a single SSH call for efficiency
+    # Note: Don't redirect stderr inside the command since ssh_exec already does it
+    local process_info
+    process_info=$(ssh_exec "$ssh_host" "$ssh_key" \
+        "pid=\$(pgrep agave-validator | head -1) && ps -p \$pid -o pid=,etime=,%cpu=,%mem= | tail -1 | tr -s ' ' | sed 's/^ //'" || echo "")
 
-    local uptime
-    uptime=$(ssh_exec "$ssh_host" "$ssh_key" \
-        "ps -p $pid -o etime= 2>/dev/null | tr -d ' '" || echo "unknown")
+    if [[ -z "$process_info" ]]; then
+        echo "running|unknown|||"
+        return 0
+    fi
 
-    local cpu
-    cpu=$(ssh_exec "$ssh_host" "$ssh_key" \
-        "ps -p $pid -o %cpu= 2>/dev/null | tr -d ' '" || echo "unknown")
+    # Parse the space-separated output
+    local pid uptime cpu mem
+    read -r pid uptime cpu mem <<< "$process_info"
 
-    local mem
-    mem=$(ssh_exec "$ssh_host" "$ssh_key" \
-        "ps -p $pid -o %mem= 2>/dev/null | tr -d ' '" || echo "unknown")
-
-    echo "running|$pid|$uptime|$cpu|$mem"
+    echo "running|${pid:-unknown}|${uptime:-unknown}|${cpu:-unknown}|${mem:-unknown}"
 }
 
 get_vote_account_status() {
