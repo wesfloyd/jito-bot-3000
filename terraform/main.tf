@@ -4,15 +4,6 @@
 
 provider "aws" {
   region = var.aws_region
-  
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "terraform"
-      CreatedAt   = timestamp()
-    }
-  }
 }
 
 # ============================================================================
@@ -155,7 +146,11 @@ resource "aws_security_group" "jito_validator" {
   }
 
   tags = {
-    Name = var.security_group_name
+    Name        = var.security_group_name
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    CreatedAt   = timestamp()
   }
 
   lifecycle {
@@ -172,7 +167,11 @@ resource "aws_key_pair" "jito_validator" {
   public_key = file("${var.keys_dir}/${var.key_name}.pub")
 
   tags = {
-    Name = var.key_name
+    Name        = var.key_name
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    CreatedAt   = timestamp()
   }
 }
 

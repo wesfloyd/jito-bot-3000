@@ -37,10 +37,14 @@ main() {
     # Show cost warning
     show_cost_warning
 
-    # Confirm before applying
-    if ! prompt_confirmation "Do you want to apply the Terraform configuration?"; then
-        log_info "Apply cancelled by user"
-        exit 0
+    # Confirm before applying (unless AUTO_CONFIRM is set)
+    if [[ "${AUTO_CONFIRM:-}" != "true" ]]; then
+        if ! prompt_confirmation "Do you want to apply the Terraform configuration?"; then
+            log_info "Apply cancelled by user"
+            exit 0
+        fi
+    else
+        log_info "Auto-confirm enabled, proceeding with apply..."
     fi
 
     # Apply Terraform configuration
