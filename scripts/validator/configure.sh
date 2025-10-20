@@ -211,6 +211,15 @@ LOG_FILE="$LOG_DIR/validator-$(date +%Y%m%d-%H%M%S).log"
 echo "Starting Jito-Solana Validator..."
 echo "Log file: $LOG_FILE"
 
+# Known validators for testnet (trusted validators to bootstrap from)
+KNOWN_VALIDATORS=(
+    "5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on"  # Solana Labs
+    "dDzy5SR3AXdYWVqbDEkVFdvSPCtS9ihF5kJkHCtXoFs"   # Solana Foundation
+    "Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN"  # Solana Foundation
+    "eoKpUABi59aT4rR9HGS3LcMecfut9x7zJyodWWP43YQ"   # Certus One
+    "9QxCLckBiJc783jnMvXZubK4wH86Eqqvashtrwvcsgkv"  # Chorus One
+)
+
 # Start validator
 exec agave-validator \
     --identity "$IDENTITY_KEYPAIR" \
@@ -224,6 +233,11 @@ exec agave-validator \
     --entrypoint "$ENTRYPOINT" \
     --expected-genesis-hash "$EXPECTED_GENESIS_HASH" \
     --expected-shred-version "$EXPECTED_SHRED_VERSION" \
+    --known-validator "${KNOWN_VALIDATORS[0]}" \
+    --known-validator "${KNOWN_VALIDATORS[1]}" \
+    --known-validator "${KNOWN_VALIDATORS[2]}" \
+    --known-validator "${KNOWN_VALIDATORS[3]}" \
+    --known-validator "${KNOWN_VALIDATORS[4]}" \
     --wal-recovery-mode skip_any_corrupted_record \
     --limit-ledger-size 50000000 \
     --block-engine-url "$BLOCK_ENGINE_URL" \
