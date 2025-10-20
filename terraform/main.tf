@@ -127,9 +127,9 @@ resource "aws_security_group" "jito_validator" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # RPC port (optional - uncomment if needed)
+  # RPC ports (required for external RPC access and validator health checks)
   ingress {
-    description = "RPC endpoint"
+    description = "RPC endpoints"
     from_port   = 8899
     to_port     = 8900
     protocol    = "tcp"
