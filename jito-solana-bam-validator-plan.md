@@ -357,83 +357,221 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 9: BAM Configuration ⏳ IN PROGRESS
+## Phase 9: BAM Dry Run Configuration (Testnet) ⏳ READY TO TEST
 
-### 9.1 Prerequisites Check
+### Quick Start Guide (30-60 minutes)
+**For rapid BAM testing tomorrow**, follow these steps:
+
+1. **Backup current config**: `cp ~/validator/start-validator.sh ~/validator/start-validator.sh.pre-bam`
+2. **Add BAM flags** to startup script:
+   - `--bam-url http://ny.testnet.bam.jito.wtf`
+   - `--enable-rpc-transaction-history`
+3. **Add metrics** before `exec agave-validator`:
+   - `export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"`
+4. **Restart**: `sudo systemctl restart jito-validator`
+5. **Monitor**: `tail -f ~/validator/logs/validator-*.log | grep -i bam`
+
+**Expected**: Configuration accepted, no errors. "Not in leader schedule" is normal without stake.
+
+---
+
+**Strategy**: Test BAM on public testnet (recommended over local network)
+- ✅ BAM testnet infrastructure already exists at `http://ny.testnet.bam.jito.wtf`
+- ✅ Real network conditions and actual transaction flow
+- ✅ No need to set up custom BAM nodes/infrastructure
+- ⚠️ Leader schedule entry requires stake (won't produce BAM blocks without it)
+- ✅ Can validate configuration and monitor connection attempts
+
+### 9.1 Prerequisites Verification
 - [x] Check available disk space (RPC tx history requires additional storage)
   - ✅ 2TB total, 11GB used (1%) - **plenty of space for RPC history**
-  - Validator directories still initializing (catchup in progress)
-- [ ] Verify validator is fully operational on testnet (BLOCKED: validator catching up)
-- [ ] Confirm validator has stake and receives leader slots (BLOCKED: testnet, 0 stake)
+- [x] Verify validator is fully operational on testnet
+  - ✅ Validator caught up and voting on slot 365017523
+  - ✅ Processing ~2,400 transactions/slot
+  - ✅ 2,169 nodes discovered, 286 RPC nodes available
+- [ ] Confirm validator stake status (expected: 0 SOL on testnet - no leader slots)
+  - ⚠️ Without stake: BAM will show "not in leader schedule" (expected)
+  - ℹ️ This is OK for dry run configuration testing
 
-### 9.2 Configuration File
+### 9.2 BAM Configuration File
 - [x] Create `config/bam-config.env` with BAM endpoints and credentials
-  - BAM URL: `http://ny.testnet.bam.jito.wtf`
-  - Metrics: `http://bam-public-metrics.jito.wtf:8086`
-  - Database: `testnet-bam-validators`
-  - Default: `ENABLE_BAM="false"` (toggle to enable)
+  ```bash
+  # BAM Testnet Configuration
+  BAM_URL="http://ny.testnet.bam.jito.wtf"
+  BAM_METRICS_HOST="http://bam-public-metrics.jito.wtf:8086"
+  BAM_METRICS_DB="testnet-bam-validators"
+  BAM_METRICS_USER="testnet-bam-validator"
+  BAM_METRICS_PASSWORD="wambamdamn"
+  ENABLE_BAM="false"  # Toggle to enable
+  ```
 
-### 9.3 Validator Configuration Script
-- [x] Create `scripts/validator/configure-bam.sh`
-  - Automated prerequisite checks (validator running, catchup status, disk space)
+### 9.3 Quick Dry Run Testing (30-60 minutes)
+**Goal**: Validate BAM configuration without requiring leader slots
+
+- [ ] **Step 1**: Update validator startup script with BAM flags
+  ```bash
+  # Add to ~/validator/start-validator.sh:
+  --bam-url http://ny.testnet.bam.jito.wtf \
+  --enable-rpc-transaction-history \
+  ```
+
+- [ ] **Step 2**: Add metrics environment variable
+  ```bash
+  # Add before exec agave-validator:
+  export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"
+  ```
+
+- [ ] **Step 3**: Backup current configuration
+  ```bash
+  cp ~/validator/start-validator.sh ~/validator/start-validator.sh.pre-bam
+  ```
+
+- [ ] **Step 4**: Restart validator with BAM configuration
+  ```bash
+  sudo systemctl restart jito-validator
+  ```
+
+- [ ] **Step 5**: Monitor logs for BAM-related messages
+  ```bash
+  # Watch for BAM connection attempts:
+  tail -f ~/validator/logs/validator-*.log | grep -i bam
+
+  # Expected messages (without leader slots):
+  # - "BAM configuration loaded"
+  # - "Not in leader schedule" (expected without stake)
+  # - No errors about BAM flags or connectivity
+  ```
+
+---
+
+## Phase 10: BAM Integration Validation
+
+### 10.1 Configuration Verification (15-30 minutes)
+- [ ] Verify validator accepts BAM flags without errors
+  ```bash
+  # Check validator process started successfully
+  sudo systemctl status jito-validator
+
+  # Verify BAM flags in process arguments
+  ps aux | grep agave-validator | grep -o 'bam-url'
+  ```
+
+- [ ] Check BAM endpoint connectivity
+  ```bash
+  # Test BAM endpoint is reachable
+  curl -I http://ny.testnet.bam.jito.wtf
+
+  # Expected: HTTP 200 or redirect (confirms endpoint exists)
+  ```
+
+- [ ] Verify RPC transaction history is enabled
+  ```bash
+  # Check validator logs for RPC history messages
+  grep "enable-rpc-transaction-history" ~/validator/logs/validator-*.log
+  ```
+
+### 10.2 Expected Outcomes (Without Leader Slots)
+**What WILL work** (configuration validation):
+- ✅ BAM flags accepted without errors
+- ✅ Validator starts and runs normally
+- ✅ BAM endpoint connectivity confirmed
+- ✅ RPC transaction history enabled
+- ✅ Metrics potentially being sent to BAM infrastructure
+
+**What WON'T work** (requires stake):
+- ❌ Won't produce BAM blocks (not in leader schedule)
+- ❌ Won't receive BAM block assembly requests
+- ⚠️ "Not in leader schedule" messages are EXPECTED
+
+### 10.3 Automation Script (Optional)
+- [ ] Create `scripts/validator/configure-bam.sh` for automated BAM setup
+  - Automated prerequisite checks (validator running, disk space)
   - Leader schedule verification (warning only on testnet)
   - BAM flag injection into startup script
   - Enable/disable toggle: `--enable` / `--disable` flags
-  - Force mode: `--force` to bypass catchup checks
+  - Force mode: `--force` to bypass checks
   - Automatic backup of existing configuration
-- [ ] Execute script to enable BAM (BLOCKED: waiting for validator catchup)
 
 ---
 
-## Phase 10: BAM Integration
+## Phase 11: BAM Monitoring & Production Readiness
 
-### 10.1 Update Validator Launch Configuration
-- [ ] Modify `scripts/validator/configure.sh` to add BAM flags conditionally
-- [ ] Add `--bam-url http://ny.testnet.bam.jito.wtf`
-- [ ] Add `--enable-rpc-transaction-history`
-- [ ] Add metrics export if enabled:
-```bash
-export SOLANA_METRICS_CONFIG="host=${BAM_METRICS_HOST},db=${BAM_METRICS_DB},u=${BAM_METRICS_USER},p=${BAM_METRICS_PASSWORD}"
-```
+### 11.1 Dry Run Results Analysis
+- [ ] Document BAM connection attempts in logs
+  ```bash
+  # Extract BAM-related log messages
+  grep -i bam ~/validator/logs/validator-*.log | tail -50
+  ```
 
-### 10.2 Enable/Disable Toggle
-- [ ] Add environment variable `ENABLE_BAM` (default: false)
-- [ ] Implement conditional BAM flags in startup script
-- [ ] Test validator startup with BAM disabled (default)
-- [ ] Test validator startup with BAM enabled
+- [ ] Verify no errors related to BAM configuration
+  ```bash
+  # Check for BAM errors
+  grep -i "bam.*error\|bam.*failed" ~/validator/logs/validator-*.log
+  ```
 
-### 10.3 Deploy BAM Configuration
-- [ ] Restart validator with BAM flags enabled
-- [ ] Monitor logs for BAM connection messages
-- [ ] Verify BAM endpoint connectivity
+- [ ] Confirm validator stability with BAM flags
+  ```bash
+  # Validator should remain stable and voting
+  solana catchup <validator-identity> -ut
+  solana vote-account <vote-account> -ut
+  ```
 
----
+### 11.2 Leader Schedule Path (Future - Requires Stake)
+**For actual BAM block production, you would need**:
+- [ ] Request testnet stake delegation from Solana Foundation
+- [ ] Wait for epoch boundary (stake activation)
+- [ ] Receive leader slots → BAM will connect
+- [ ] Produce BAM blocks with verifiable execution
 
-## Phase 11: BAM Monitoring & Validation
+**Alternative paths to test BAM block production**:
+1. **Mainnet** (not recommended for testing):
+   - Requires significant SOL stake (~10,000+ SOL)
+   - High cost, production environment
 
-### 11.1 Connection Verification
-- [ ] Create `scripts/utils/verify-bam.sh`
-- [ ] Check BAM node connectivity (`http://ny.testnet.bam.jito.wtf`)
-- [ ] Verify metrics submission to BAM infrastructure
-- [ ] Monitor validator logs for BAM connection status
+2. **Solana Foundation Testnet Delegation**:
+   - Apply for testnet stake delegation
+   - May take days/weeks to receive
+   - Free, but requires application process
 
-### 11.2 Status Script Updates
+3. **Local Network with Stake** (complex):
+   - Set up local Solana cluster
+   - Configure your own BAM infrastructure
+   - Much more complex than testnet
+
+### 11.3 Status Monitoring Updates
 - [ ] Update `scripts/utils/status.sh` with BAM checks:
-  - [ ] BAM connection status
-  - [ ] BAM endpoint health
-  - [ ] Metrics reporting status
-  - [ ] Leader slot utilization
-
-### 11.3 Monitoring & Alerts
-- [ ] Track BAM-specific performance metrics
-- [ ] Monitor disk usage (RPC transaction history)
-- [ ] Set up alerts for BAM disconnections
-- [ ] Document BAM connection issues in logs
+  ```bash
+  # Add to status.sh:
+  - BAM configuration status (enabled/disabled)
+  - BAM endpoint connectivity
+  - RPC transaction history status
+  - Leader slot count (if any)
+  - BAM-specific metrics (if available)
+  ```
 
 ### 11.4 Documentation
-- [ ] Update README.md with BAM enable/disable instructions
-- [ ] Document BAM troubleshooting steps
-- [ ] Add BAM-specific health checks to troubleshooting guide
+- [ ] Document BAM dry run results in README.md
+- [ ] Add BAM troubleshooting section:
+  - "Not in leader schedule" - expected without stake
+  - BAM endpoint connectivity issues
+  - RPC transaction history disk usage
+  - Metrics submission verification
+- [ ] Create BAM testing summary:
+  - What was tested (dry run configuration)
+  - What worked (configuration acceptance)
+  - What's blocked (block production requires stake)
+  - Next steps (stake delegation or mainnet)
+
+### 11.5 Production Readiness Checklist
+**For moving BAM to mainnet**:
+- [ ] Dry run on testnet successful ✅
+- [ ] No configuration errors ✅
+- [ ] BAM endpoint connectivity verified ✅
+- [ ] Validator stable with BAM flags ✅
+- [ ] Sufficient disk space for RPC history ✅
+- [ ] Monitoring and alerts configured
+- [ ] Stake acquisition plan (mainnet requires real SOL)
+- [ ] Backup and recovery procedures tested
 
 ---
 
