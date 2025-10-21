@@ -333,7 +333,8 @@ ExecStart=/home/ubuntu/validator/start-validator.sh
 Restart=on-failure
 RestartSec=10
 LimitNOFILE=1000000
-LimitNPROC=1000000
+LimitMEMLOCK=infinity
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target
