@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Jito-Solana Build Script
+# BAM Validator Build Script
 #
-# This script builds the Jito-Solana validator binary on the remote EC2 instance.
+# This script builds the BAM validator binary on the remote EC2 instance.
+# BAM (Block Auction Mechanism) is Jito's enhanced validator client with TEE support.
+#
 # It performs the following tasks:
-# 1. Clones the Jito-Solana repository
+# 1. Clones the bam-client repository (Jito's BAM-enabled validator fork)
 # 2. Checks out the appropriate version/tag
 # 3. Builds the validator binary
 # 4. Installs the binary to the system
@@ -13,7 +15,7 @@
 #   ./scripts/validator/build.sh [--version VERSION] [--force]
 #
 # Options:
-#   --version VERSION    Jito-Solana version to build (default: latest testnet-compatible)
+#   --version VERSION    BAM client version to build (default: v3.0.6-bam)
 #   --force             Skip confirmation prompts
 #
 # Exit codes:
@@ -41,8 +43,8 @@ source "${PROJECT_ROOT}/scripts/utils/lib/terraform-helpers.sh"
 # ============================================================================
 
 FORCE_MODE=false
-# Default to v2.1.3-jito which is testnet-compatible
-JITO_VERSION="${JITO_VERSION:-v2.1.3-jito}"
+# Default to v3.0.6-bam which is the latest BAM-enabled version
+BAM_VERSION="${BAM_VERSION:-v3.0.6-bam}"
 
 # ============================================================================
 # Argument Parsing
@@ -52,7 +54,7 @@ parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --version)
-                JITO_VERSION="$2"
+                BAM_VERSION="$2"
                 shift 2
                 ;;
             --force)
@@ -63,19 +65,19 @@ parse_args() {
                 cat << EOF
 Usage: $0 [OPTIONS]
 
-Build Jito-Solana validator binary on the remote EC2 instance.
+Build BAM validator binary on the remote EC2 instance.
 
 Options:
-  --version VERSION   Jito-Solana version to build (default: $JITO_VERSION)
+  --version VERSION   BAM client version to build (default: $BAM_VERSION)
   --force            Skip confirmation prompts
   -h, --help         Show this help message
 
 Examples:
-  # Build default version
+  # Build default version (v3.0.6-bam)
   $0
 
   # Build specific version
-  $0 --version v2.1.3-jito
+  $0 --version v3.0.6-bam
 
   # Non-interactive mode
   $0 --force
@@ -101,7 +103,7 @@ generate_remote_build_script() {
 
     cat << REMOTE_SCRIPT
 #!/usr/bin/env bash
-# This script runs on the remote EC2 instance to build Jito-Solana
+# This script runs on the remote EC2 instance to build BAM validator
 set -euo pipefail
 
 # Colors
@@ -128,23 +130,33 @@ log_error() {
 }
 
 echo "================================"
-echo " Jito-Solana Build"
+echo " BAM Validator Build"
 echo "================================"
 echo ""
 
 # Ensure Rust and Solana CLI are in PATH
 export PATH="\$HOME/.cargo/bin:\$HOME/.local/share/solana/install/active_release/bin:\$PATH"
 
-JITO_VERSION="$version"
-JITO_DIR="\$HOME/jito-solana"
+BAM_VERSION="$version"
+BAM_DIR="\$HOME/bam-client"
+
+# ============================================================================
+# Backup existing binary if it exists
+# ============================================================================
+
+if [[ -f "\$HOME/.local/bin/agave-validator" ]]; then
+    log_info "Backing up existing agave-validator binary..."
+    cp "\$HOME/.local/bin/agave-validator" "\$HOME/.local/bin/agave-validator.backup-\$(date +%Y%m%d-%H%M%S)"
+    log_success "Backup created"
+fi
 
 # ============================================================================
 # Clone or Update Repository
 # ============================================================================
 
-if [[ -d "\$JITO_DIR" ]]; then
-    log_info "Jito-Solana repository already exists"
-    cd "\$JITO_DIR"
+if [[ -d "\$BAM_DIR" ]]; then
+    log_info "BAM client repository already exists"
+    cd "\$BAM_DIR"
 
     log_info "Fetching latest changes..."
     git fetch --all --tags
@@ -153,17 +165,17 @@ if [[ -d "\$JITO_DIR" ]]; then
     git clean -fdx
     git reset --hard
 else
-    log_info "Cloning Jito-Solana repository..."
-    git clone https://github.com/jito-foundation/jito-solana.git "\$JITO_DIR"
-    cd "\$JITO_DIR"
+    log_info "Cloning BAM client repository..."
+    git clone https://github.com/jito-labs/bam-client.git "\$BAM_DIR"
+    cd "\$BAM_DIR"
 fi
 
 # ============================================================================
 # Checkout Version
 # ============================================================================
 
-log_info "Checking out version: \$JITO_VERSION"
-git checkout "\$JITO_VERSION"
+log_info "Checking out version: \$BAM_VERSION"
+git checkout "\$BAM_VERSION"
 
 COMMIT_HASH=\$(git rev-parse --short HEAD)
 log_info "Building from commit: \$COMMIT_HASH"
@@ -181,7 +193,7 @@ log_success "Submodules initialized"
 # Build Validator
 # ============================================================================
 
-log_info "Building Jito-Solana validator..."
+log_info "Building BAM validator..."
 log_warn "This will take 20-30 minutes on m7i.4xlarge..."
 echo ""
 
@@ -189,9 +201,9 @@ echo ""
 export RUSTFLAGS="-C target-cpu=native"
 
 # Build with release profile
-# Note: Binary name changed from solana-validator to agave-validator in v2.x
+# BAM client builds the agave-validator binary with BAM support
 if cargo build --release --bin agave-validator; then
-    log_success "Validator binary built successfully"
+    log_success "BAM validator binary built successfully"
 else
     log_error "Build failed"
     exit 1
@@ -224,7 +236,14 @@ export PATH="\$HOME/.local/bin:\$PATH"
 # Verify installation
 if command -v agave-validator >/dev/null 2>&1; then
     VALIDATOR_VERSION=\$(agave-validator --version | head -1)
-    log_success "Jito-Solana validator installed: \$VALIDATOR_VERSION"
+    log_success "BAM validator installed: \$VALIDATOR_VERSION"
+
+    # Verify BAM support
+    if agave-validator --help 2>&1 | grep -q "bam-url"; then
+        log_success "BAM support verified: --bam-url flag available"
+    else
+        log_warn "BAM flag not found in help output (might be version-specific)"
+    fi
 else
     log_error "Validator installation verification failed"
     exit 1
@@ -235,9 +254,9 @@ fi
 # ============================================================================
 
 log_info "Build Information:"
-echo "  Version: \$JITO_VERSION"
+echo "  Version: \$BAM_VERSION"
 echo "  Commit: \$COMMIT_HASH"
-echo "  Binary: \$HOME/.local/bin/solana-validator"
+echo "  Binary: \$HOME/.local/bin/agave-validator"
 
 # Check binary size
 BINARY_SIZE=\$(du -h "\$HOME/.local/bin/agave-validator" | cut -f1)
@@ -247,11 +266,11 @@ echo "  Size: \$BINARY_SIZE"
 # Completion
 # ============================================================================
 
-log_success "Jito-Solana build complete!"
+log_success "BAM validator build complete!"
 echo ""
 log_info "Next steps:"
-log_info "  1. Upload validator keypairs"
-log_info "  2. Configure validator startup script"
+log_info "  1. Upload validator keypairs (if not already done)"
+log_info "  2. Configure validator startup script with --bam-url flag"
 log_info "  3. Start the validator"
 
 REMOTE_SCRIPT
@@ -318,7 +337,7 @@ run_remote_build() {
     local ssh_key=$2
     local version=$3
 
-    log_section "Building Jito-Solana"
+    log_section "Building BAM Validator"
 
     log_info "Connecting to: $ssh_host"
     log_info "Building version: $version"
@@ -363,12 +382,12 @@ run_remote_build() {
 
 main() {
     print_banner
-    log_section "Jito-Solana Build"
+    log_section "BAM Validator Build"
 
     # Parse arguments
     parse_args "$@"
 
-    log_info "Jito-Solana version: $JITO_VERSION"
+    log_info "BAM client version: $BAM_VERSION"
 
     # Get SSH connection info from Terraform
     log_info "Getting connection information from Terraform..."
@@ -399,11 +418,13 @@ main() {
     # Confirm before proceeding (unless force mode)
     if [[ "$FORCE_MODE" == false ]]; then
         echo ""
-        log_warn "This will build Jito-Solana validator from source"
+        log_warn "This will build BAM validator from source"
         log_info "Build details:"
-        log_info "  Version: $JITO_VERSION"
+        log_info "  Version: $BAM_VERSION"
+        log_info "  Repository: jito-labs/bam-client"
         log_info "  Duration: ~20-30 minutes"
         log_info "  CPU usage: High (all cores)"
+        log_warn "  Note: This will replace existing agave-validator binary"
         echo ""
         if ! prompt_confirmation "Proceed with build?"; then
             log_info "Build cancelled by user"
@@ -415,7 +436,7 @@ main() {
     local start_time
     start_time=$(start_timer)
 
-    if ! run_remote_build "$ssh_host" "$ssh_key" "$JITO_VERSION"; then
+    if ! run_remote_build "$ssh_host" "$ssh_key" "$BAM_VERSION"; then
         exit 1
     fi
 
@@ -425,13 +446,13 @@ main() {
     # Success summary
     log_section "Build Complete"
 
-    log_success "Jito-Solana validator built successfully"
+    log_success "BAM validator built successfully"
     log_info "Build duration: $duration"
     echo ""
     log_info "Next steps:"
-    log_info "  1. Upload validator keypairs to remote instance"
-    log_info "  2. Configure validator startup script"
-    log_info "  3. Start the validator"
+    log_info "  1. Verify --bam-url flag is available"
+    log_info "  2. Update validator startup script with BAM configuration"
+    log_info "  3. Restart the validator with BAM enabled"
 
     exit 0
 }

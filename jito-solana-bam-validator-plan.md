@@ -357,89 +357,101 @@ resource "aws_instance" "jito_validator" {
 
 ---
 
-## Phase 9: BAM Dry Run Configuration (Testnet) ⏳ READY TO TEST
+## Phase 9: BAM Client Migration (Testnet) 🔄 IN PROGRESS
 
-### Quick Start Guide (30-60 minutes)
-**For rapid BAM testing tomorrow**, follow these steps:
+### Strategy Update (2025-10-21)
+**Revised Approach**: Replace jito-solana with bam-client binary
+- ❌ **Original plan**: Add `--bam-url` flag to existing jito-solana binary
+- ✅ **New plan**: Build and install bam-client (v3.0.6-bam) which includes BAM support
+- **Reason**: The `--bam-url` flag only exists in jito-labs/bam-client fork, not jito-foundation/jito-solana
 
-1. **Backup current config**: `cp ~/validator/start-validator.sh ~/validator/start-validator.sh.pre-bam`
-2. **Add BAM flags** to startup script:
-   - `--bam-url http://ny.testnet.bam.jito.wtf`
-   - `--enable-rpc-transaction-history`
-3. **Add metrics** before `exec agave-validator`:
-   - `export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"`
-4. **Restart**: `sudo systemctl restart jito-validator`
-5. **Monitor**: `tail -f ~/validator/logs/validator-*.log | grep -i bam`
+### 9.1 Architecture Decision
+**Single Instance, Binary Replacement Approach**:
+- ✅ Replace existing agave-validator binary with BAM-enabled version
+- ✅ Reuse existing validator identity, vote account, and ledger data
+- ✅ Cost-efficient: No second EC2 instance needed
+- ✅ BAM client includes all Jito MEV features + BAM capabilities
+- ✅ Same configuration files, just different binary
 
-**Expected**: Configuration accepted, no errors. "Not in leader schedule" is normal without stake.
+**Repository Change**:
+- **Old**: `https://github.com/jito-foundation/jito-solana` (v3.0.6-jito)
+- **New**: `https://github.com/jito-labs/bam-client` (v3.0.6-bam)
 
----
-
-**Strategy**: Test BAM on public testnet (recommended over local network)
-- ✅ BAM testnet infrastructure already exists at `http://ny.testnet.bam.jito.wtf`
-- ✅ Real network conditions and actual transaction flow
-- ✅ No need to set up custom BAM nodes/infrastructure
-- ⚠️ Leader schedule entry requires stake (won't produce BAM blocks without it)
-- ✅ Can validate configuration and monitor connection attempts
-
-### 9.1 Prerequisites Verification
+### 9.2 Prerequisites Verification
 - [x] Check available disk space (RPC tx history requires additional storage)
   - ✅ 2TB total, 11GB used (1%) - **plenty of space for RPC history**
 - [x] Verify validator is fully operational on testnet
-  - ✅ Validator caught up and voting on slot 365017523
-  - ✅ Processing ~2,400 transactions/slot
-  - ✅ 2,169 nodes discovered, 286 RPC nodes available
-- [ ] Confirm validator stake status (expected: 0 SOL on testnet - no leader slots)
+  - ✅ Validator caught up and voting on slot 365156866
+  - ✅ Processing transactions normally
+  - ✅ Vote account active with 34,209 credits
+- [x] Confirm validator stake status (expected: 0 SOL on testnet - no leader slots)
+  - ✅ Verified: No stake accounts found (expected on testnet)
   - ⚠️ Without stake: BAM will show "not in leader schedule" (expected)
   - ℹ️ This is OK for dry run configuration testing
 
-### 9.2 BAM Configuration File
-- [x] Create `config/bam-config.env` with BAM endpoints and credentials
+### 9.3 Build Script Updates
+- [x] **Updated `scripts/validator/build.sh`** to use bam-client repository
+  - Changed repository URL from jito-foundation/jito-solana to jito-labs/bam-client
+  - Updated default version from v2.1.3-jito to v3.0.6-bam
+  - Added automatic backup of existing agave-validator binary
+  - Added verification step to confirm `--bam-url` flag is available
+  - Updated all documentation and help text
+
+### 9.4 Validator Startup Script Updates
+- [x] **Backup current configuration**
+  - Created: `~/validator/start-validator.sh.pre-bam`
+
+- [x] **Updated `~/validator/start-validator.sh`** with BAM configuration
+  - Added BAM URL: `--bam-url http://ny.testnet.bam.jito.wtf`
+  - Added RPC history: `--enable-rpc-transaction-history`
+  - Added metrics: `export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"`
+  - Updated startup message to indicate BAM is enabled
+
+### 9.5 BAM Client Build (In Progress)
+- [x] **Initiated build**: `./scripts/validator/build.sh --force`
+  - Building version: v3.0.6-bam
+  - Repository: jito-labs/bam-client
+  - Status: Cloning and building (~20-30 minutes)
+  - Automatic binary backup created before replacement
+
+**Check build status**:
+```bash
+# Check if build is still running
+ps aux | grep "scripts/validator/build.sh"
+
+# Or check validator build progress on EC2 instance
+ssh -i keys/jito-validator-key.pem ubuntu@54.215.235.126 "ps aux | grep 'cargo build'"
+```
+
+### 9.6 Next Steps (After Build Completes)
+- [ ] **Verify build success**
   ```bash
-  # BAM Testnet Configuration
-  BAM_URL="http://ny.testnet.bam.jito.wtf"
-  BAM_METRICS_HOST="http://bam-public-metrics.jito.wtf:8086"
-  BAM_METRICS_DB="testnet-bam-validators"
-  BAM_METRICS_USER="testnet-bam-validator"
-  BAM_METRICS_PASSWORD="wambamdamn"
-  ENABLE_BAM="false"  # Toggle to enable
+  ssh -i keys/jito-validator-key.pem ubuntu@54.215.235.126 "agave-validator --version"
+  # Expected: agave-validator with "bam" in version string
   ```
 
-### 9.3 Quick Dry Run Testing (30-60 minutes)
-**Goal**: Validate BAM configuration without requiring leader slots
-
-- [ ] **Step 1**: Update validator startup script with BAM flags
+- [ ] **Verify BAM flag support**
   ```bash
-  # Add to ~/validator/start-validator.sh:
-  --bam-url http://ny.testnet.bam.jito.wtf \
-  --enable-rpc-transaction-history \
+  ssh -i keys/jito-validator-key.pem ubuntu@54.215.235.126 "agave-validator --help | grep bam-url"
+  # Expected: --bam-url flag should be present
   ```
 
-- [ ] **Step 2**: Add metrics environment variable
+- [ ] **Restart validator with BAM configuration**
   ```bash
-  # Add before exec agave-validator:
-  export SOLANA_METRICS_CONFIG="host=http://bam-public-metrics.jito.wtf:8086,db=testnet-bam-validators,u=testnet-bam-validator,p=wambamdamn"
+  ssh -i keys/jito-validator-key.pem ubuntu@54.215.235.126 "sudo systemctl restart jito-validator"
   ```
 
-- [ ] **Step 3**: Backup current configuration
+- [ ] **Monitor logs for BAM-related messages**
   ```bash
-  cp ~/validator/start-validator.sh ~/validator/start-validator.sh.pre-bam
+  ssh -i keys/jito-validator-key.pem ubuntu@54.215.235.126 "tail -f ~/validator/logs/validator-*.log | grep -i bam"
+  # Expected: BAM connection attempts, no errors
+  # Expected: "Not in leader schedule" is normal without stake
   ```
 
-- [ ] **Step 4**: Restart validator with BAM configuration
+- [ ] **Verify validator stability**
   ```bash
-  sudo systemctl restart jito-validator
-  ```
-
-- [ ] **Step 5**: Monitor logs for BAM-related messages
-  ```bash
-  # Watch for BAM connection attempts:
-  tail -f ~/validator/logs/validator-*.log | grep -i bam
-
-  # Expected messages (without leader slots):
-  # - "BAM configuration loaded"
-  # - "Not in leader schedule" (expected without stake)
-  # - No errors about BAM flags or connectivity
+  ./scripts/validator/launch.sh status
+  # Should show validator running normally with BAM flags
   ```
 
 ---

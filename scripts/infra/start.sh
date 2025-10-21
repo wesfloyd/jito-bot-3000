@@ -70,6 +70,19 @@ main() {
                 log_info "Auto-confirm enabled, proceeding with start..."
             fi
 
+            # Update security group with current IP before starting
+            log_info "Updating security group with current IP..."
+            local terraform_dir
+            terraform_dir=$(get_terraform_dir)
+            (
+                cd "$terraform_dir" || exit 1
+                if terraform apply -auto-approve >/dev/null 2>&1; then
+                    log_success "Security group updated with current IP"
+                else
+                    log_warn "Failed to update security group; SSH access may not work"
+                fi
+            )
+
             # Start the instance
             log_info "Starting instance: $instance_id"
             local aws_region
@@ -77,16 +90,14 @@ main() {
             if aws ec2 start-instances --region "$aws_region" --instance-ids "$instance_id" >/dev/null; then
                 log_success "Instance start initiated successfully"
                 log_info "Instance will start in a few moments"
-                
+
                 # Wait for instance to start
                 log_info "Waiting for instance to start..."
                 aws ec2 wait instance-running --region "$aws_region" --instance-ids "$instance_id"
                 log_success "Instance started successfully"
-                
+
                 # Refresh Terraform state so outputs reflect the new AWS state
                 log_info "Refreshing Terraform state to sync instance status..."
-                local terraform_dir
-                terraform_dir=$(get_terraform_dir)
                 (
                     cd "$terraform_dir" || exit 1
                     if terraform apply -refresh-only -auto-approve >/dev/null 2>&1; then
