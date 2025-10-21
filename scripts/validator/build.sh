@@ -41,8 +41,8 @@ source "${PROJECT_ROOT}/scripts/utils/lib/terraform-helpers.sh"
 # ============================================================================
 
 FORCE_MODE=false
-# Default to v2.1.3-jito which is testnet-compatible
-JITO_VERSION="${JITO_VERSION:-v2.1.3-jito}"
+# Default to v3.0.4-jito which is testnet-compatible (Solana 3.0.x)
+JITO_VERSION="${JITO_VERSION:-v3.0.4-jito}"
 
 # ============================================================================
 # Argument Parsing
