@@ -46,8 +46,10 @@ JITO_BLOCK_ENGINE_URL="https://ny.testnet.block-engine.jito.wtf"
 JITO_RELAYER_URL="nyc.testnet.relayer.jito.wtf:8100"
 JITO_SHRED_RECEIVER_ADDR="141.98.216.97:1002"
 
-# Solana testnet configuration
-TESTNET_ENTRYPOINT="entrypoint.testnet.solana.com:8001"
+# Solana testnet configuration - MULTIPLE ENTRYPOINTS for better discovery
+TESTNET_ENTRYPOINT1="entrypoint.testnet.solana.com:8001"
+TESTNET_ENTRYPOINT2="entrypoint2.testnet.solana.com:8001"
+TESTNET_ENTRYPOINT3="entrypoint3.testnet.solana.com:8001"
 TESTNET_RPC="https://api.testnet.solana.com"
 
 # Remote paths
@@ -197,10 +199,11 @@ BLOCK_ENGINE_URL="BLOCK_ENGINE_URL_PLACEHOLDER"
 RELAYER_URL="RELAYER_URL_PLACEHOLDER"
 SHRED_RECEIVER_ADDR="SHRED_RECEIVER_ADDR_PLACEHOLDER"
 
-# Testnet configuration
-ENTRYPOINT="ENTRYPOINT_PLACEHOLDER"
+# Testnet configuration - MULTIPLE ENTRYPOINTS for better discovery
+ENTRYPOINT1="ENTRYPOINT1_PLACEHOLDER"
+ENTRYPOINT2="ENTRYPOINT2_PLACEHOLDER"
+ENTRYPOINT3="ENTRYPOINT3_PLACEHOLDER"
 EXPECTED_GENESIS_HASH="4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
-EXPECTED_SHRED_VERSION="0"
 
 # Create log directory
 mkdir -p "$LOG_DIR"
@@ -218,16 +221,18 @@ echo "Error log: $ERROR_LOG"
 export RUST_BACKTRACE=1
 export RUST_LOG=info
 
-# Known validators for testnet (trusted validators to bootstrap from)
+# UPDATED: Active validators running 3.0.6 (from solana validators -ut)
+# Using actively voting validators for better RPC peer discovery
 KNOWN_VALIDATORS=(
-    "5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on"  # Solana Labs
-    "dDzy5SR3AXdYWVqbDEkVFdvSPCtS9ihF5kJkHCtXoFs"   # Solana Foundation
-    "Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN"  # Solana Foundation
-    "eoKpUABi59aT4rR9HGS3LcMecfut9x7zJyodWWP43YQ"   # Certus One
-    "9QxCLckBiJc783jnMvXZubK4wH86Eqqvashtrwvcsgkv"  # Chorus One
+    "FQmkXYMLeo1BjqJ2u29gPffzCP4c8ukLQn3qADdPAAgH"  # Active 3.0.6
+    "thorNNMs3a7UKRMH48uSaB5KA6BC5zZPEKN5v8YPJyL"   # Active 3.0.6
+    "4JVC4HKsWkra2hkcAKaCTM3T7awMBikpwQZ67Zhaq8v3"  # Active 3.0.6 (50% commission)
+    "FBMv4JP8heqqXFPgbBKp9Pc8e4BcFzHeXosHpTSRoixo"  # Active 3.0.6
+    "AYSACY1Qv7KKUESKZ2a3mM1mBES4qJbyxa39A79T8bE4"  # Active 3.0.6
+    "BUZdr8LsrpAMtf2VyQ5QBH8cwa6TEkwM3BQ1b3zhsxf"   # Active 3.0.6
 )
 
-# Start validator
+# Start validator with MULTIPLE ENTRYPOINTS for better RPC discovery
 exec agave-validator \
     --identity "$IDENTITY_KEYPAIR" \
     --vote-account "$VOTE_ACCOUNT" \
@@ -236,22 +241,23 @@ exec agave-validator \
     --snapshots "$SNAPSHOTS_DIR" \
     --log "$LOG_FILE" \
     --rpc-port 8899 \
-    --dynamic-port-range 8000-8020 \
-    --entrypoint "$ENTRYPOINT" \
+    --dynamic-port-range 8000-8025 \
+    --entrypoint "$ENTRYPOINT1" \
+    --entrypoint "$ENTRYPOINT2" \
+    --entrypoint "$ENTRYPOINT3" \
     --expected-genesis-hash "$EXPECTED_GENESIS_HASH" \
-    --expected-shred-version "$EXPECTED_SHRED_VERSION" \
     --known-validator "${KNOWN_VALIDATORS[0]}" \
     --known-validator "${KNOWN_VALIDATORS[1]}" \
     --known-validator "${KNOWN_VALIDATORS[2]}" \
     --known-validator "${KNOWN_VALIDATORS[3]}" \
     --known-validator "${KNOWN_VALIDATORS[4]}" \
+    --known-validator "${KNOWN_VALIDATORS[5]}" \
     --wal-recovery-mode skip_any_corrupted_record \
     --limit-ledger-size 50000000 \
     --block-engine-url "$BLOCK_ENGINE_URL" \
     --relayer-url "$RELAYER_URL" \
     --shred-receiver-address "$SHRED_RECEIVER_ADDR" \
     --rpc-bind-address 0.0.0.0 \
-    --only-known-rpc \
     --full-rpc-api \
     --tip-payment-program-pubkey GJHtFqM9agxPmkeKjHny6qiRKrXZALvvFGiKf11QE7hy \
     --tip-distribution-program-pubkey F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 \
@@ -278,7 +284,9 @@ upload_validator_script() {
         -e "s|BLOCK_ENGINE_URL_PLACEHOLDER|${JITO_BLOCK_ENGINE_URL}|g" \
         -e "s|RELAYER_URL_PLACEHOLDER|${JITO_RELAYER_URL}|g" \
         -e "s|SHRED_RECEIVER_ADDR_PLACEHOLDER|${JITO_SHRED_RECEIVER_ADDR}|g" \
-        -e "s|ENTRYPOINT_PLACEHOLDER|${TESTNET_ENTRYPOINT}|g" \
+        -e "s|ENTRYPOINT1_PLACEHOLDER|${TESTNET_ENTRYPOINT1}|g" \
+        -e "s|ENTRYPOINT2_PLACEHOLDER|${TESTNET_ENTRYPOINT2}|g" \
+        -e "s|ENTRYPOINT3_PLACEHOLDER|${TESTNET_ENTRYPOINT3}|g" \
         "$temp_script"
 
     log_info "Uploading validator startup script..."
@@ -325,7 +333,8 @@ ExecStart=/home/ubuntu/validator/start-validator.sh
 Restart=on-failure
 RestartSec=10
 LimitNOFILE=1000000
-LimitNPROC=1000000
+LimitMEMLOCK=infinity
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target
@@ -397,7 +406,7 @@ main() {
         log_info "  - Jito Block Engine: $JITO_BLOCK_ENGINE_URL"
         log_info "  - Jito Relayer: $JITO_RELAYER_URL"
         log_info "  - Jito Shred Receiver: $JITO_SHRED_RECEIVER_ADDR"
-        log_info "  - Testnet Entrypoint: $TESTNET_ENTRYPOINT"
+        log_info "  - Testnet Entrypoints: $TESTNET_ENTRYPOINT1, $TESTNET_ENTRYPOINT2, $TESTNET_ENTRYPOINT3"
         echo ""
         if ! prompt_confirmation "Proceed with configuration?"; then
             log_info "Configuration cancelled by user"
